@@ -1,0 +1,72 @@
+import { supabase } from "../lib/supabase-client"
+import { TablesInsert, TablesUpdate } from "../types/database"
+
+export const getChatById = async (chatId: string) => {
+  const { data: chat, error } = await supabase
+    .from("chats")
+    .select("*")
+    .eq("id", chatId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return chat
+}
+
+export const getChatsByUserId = async (userId: string) => {
+  const { data: chats, error } = await supabase
+    .from("chats")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return chats
+}
+
+export const createChat = async (chat: TablesInsert<"chats">) => {
+  const { data: createdChat, error } = await supabase
+    .from("chats")
+    .insert([chat])
+    .select("*")
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return createdChat
+}
+
+export const updateChat = async (
+  chatId: string,
+  chat: TablesUpdate<"chats">
+) => {
+  const { data: updatedChat, error } = await supabase
+    .from("chats")
+    .update(chat)
+    .eq("id", chatId)
+    .select("*")
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return updatedChat
+}
+
+export const deleteChat = async (chatId: string) => {
+  const { error } = await supabase.from("chats").delete().eq("id", chatId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return true
+} 

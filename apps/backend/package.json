@@ -1,41 +1,28 @@
 {
-  "name": "backend",
-  "version": "0.0.0",
-  "private": true,
+  "name": "chatbot-backend",
+  "version": "1.0.0",
+  "description": "Simple chatbot backend for a small company website",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "NODE_ENV=development nodemon src/server.ts",
-    "build": "tsc --outDir dist/",
-    "build:production": "npm run build",
-    "start": "NODE_ENV=production node dist/server",
-    "migrate-postgres": "source .env && npx convostack-storage-engine-prisma-postgres migrate --dir ./postgres-storage --db-url \"$DATABASE_URL\" --shadow-db-url \"$SHADOW_DATABASE_URL\"",
-    "studio-postgres": "source .env && npx convostack-storage-engine-prisma-postgres studio --dir ./postgres-storage --db-url \"$DATABASE_URL\" --shadow-db-url \"$SHADOW_DATABASE_URL\"",
-    "pinecone-load--docs": "ts-node scripts/pinecone-load-websites.ts crawl --urls https://docs.convostack.ai --crawlLimit 1000 --shouldSummarize true --agentName convostack-docs",
-    "load-docs": "ts-node scripts/pinecone-load-websites.ts"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@dqbd/tiktoken": "^0.4.0",
-    "@pinecone-database/pinecone": "^0.1.6",
-    "@types/express": "^4.17.17",
-    "bottleneck": "^2.19.5",
-    "cheerio": "^1.0.0-rc.12",
-    "convostack": "0.0.55",
+    "@supabase/supabase-js": "^2.39.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.1.0",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "graphql-redis-subscriptions": "^2.6.0",
-    "hnswlib-node": "^1.4.2",
-    "ioredis": "^5.3.2",
-    "langchain": "^0.0.67",
-    "node-spider": "^1.4.1",
-    "prompt": "^1.3.0",
-    "ts-node": "^10.9.1",
-    "turndown": "^7.1.2",
-    "url-parse": "^1.5.10",
-    "uuidv4": "^6.2.13",
-    "yargs": "^17.7.2"
+    "openai": "^4.24.1",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/url-parse": "^1.4.8",
-    "nodemon": "^2.0.22"
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
   }
-}
+} 
