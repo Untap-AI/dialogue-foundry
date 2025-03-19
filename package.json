@@ -1,0 +1,19 @@
+{
+  "name": "dialogue-foundry",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "turbo": "^2.10.0"
+  },
+  "packageManager": "pnpm@8.0.0",
+  "workspaces": [
+    "apps/*"
+  ]
+} 

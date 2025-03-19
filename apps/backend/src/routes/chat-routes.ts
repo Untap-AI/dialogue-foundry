@@ -39,7 +39,7 @@ router.get('/:chatId', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     // TODO: Do we need user id here?
-    const { userId, name, model = DEFAULT_SETTINGS.model, temperature = DEFAULT_SETTINGS.temperature, initialMessage } = req.body
+    const { userId, name, model = DEFAULT_SETTINGS.model, temperature = DEFAULT_SETTINGS.temperature } = req.body
     
     // Generate a new user ID if not provided
     const generatedUserId = userId ?? uuidv4()
@@ -52,50 +52,7 @@ router.post('/', async (req, res) => {
       temperature
     })
     
-    let messages: Tables<"messages">[] = []
-    
-    // If an initial message is provided, create it along with an AI response
-    if (initialMessage && newChat) {
-      // Get the next sequence number (should be 1 for a new chat)
-      const nextSequenceNumber = 1
-      
-      // Save the user message using admin function to bypass RLS
-      const userMessage = await createMessageAdmin({
-        chat_id: newChat.id,
-        user_id: generatedUserId,
-        content: initialMessage,
-        role: 'user',
-        model,
-        sequence_number: nextSequenceNumber
-      })
-      
-      // Prepare messages for OpenAI API
-      const openaiMessages: Message[] = [{
-        role: 'user',
-        content: initialMessage
-      }]
-      
-      // Generate response from OpenAI
-      const aiResponseContent = await generateChatCompletion(openaiMessages, { model, temperature })
-      
-      // Save the AI response using admin function to bypass RLS
-      const aiMessage = await createMessageAdmin({
-        chat_id: newChat.id,
-        user_id: generatedUserId,
-        content: aiResponseContent || 'Sorry, I was unable to generate a response.',
-        role: 'assistant',
-        model,
-        sequence_number: nextSequenceNumber + 1
-      })
-      
-      messages = [userMessage, aiMessage] as Tables<"messages">[]
-    }
-    
-    res.status(201).json({
-      chat: newChat,
-      messages,
-      userId: generatedUserId // Include the user ID in the response
-    })
+    res.status(201).json(newChat)
   } catch (error: any) {
     console.error('Error creating chat:', error)
     res.status(500).json({ error: error.message })

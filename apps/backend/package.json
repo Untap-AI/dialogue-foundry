@@ -1,5 +1,5 @@
 {
-  "name": "chatbot-backend",
+  "name": "@dialogue-foundry/backend",
   "version": "1.0.0",
   "description": "Simple chatbot backend for a small company website",
   "main": "dist/index.js",
@@ -7,6 +7,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist",
     "restart": "supabase stop && pnpm run chat",
     "update": "git pull origin main && pnpm run db-migrate && pnpm run db-types",
     "db-reset": "supabase db reset && pnpm run db-types",
@@ -29,6 +31,8 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@crossingminds/tsconfig": "^0.2.0",
+    "@crossingminds/eslint-config": "^0.3.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.17.24",

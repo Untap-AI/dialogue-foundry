@@ -36,14 +36,42 @@ export const generateChatCompletion = async (
   settings: ChatSettings = DEFAULT_SETTINGS
 ) => {
   try {
-    const response = await openai.chat.completions.create({
+    // Extract system message if present
+    const systemMessage = messages.find(msg => msg.role === 'system');
+    const otherMessages = messages.filter(msg => msg.role !== 'system');
+    
+    // Format the input for responses API
+    const input = otherMessages.map(msg => msg.content).join('\n\n');
+    
+    const response = await openai.responses.create({
       model: settings.model,
-      messages,
+      input: input,
       temperature: settings.temperature,
-      stream: false
-    })
+      instructions: systemMessage?.content || null,
+      stream: false,
+      text: {
+        format: {
+          type: "text"
+        }
+      }
+    });
 
-    return response.choices[0].message.content
+    // Extract the text content from the response
+    const outputMessage = response.output.find(item => 
+      item.type === 'message' && item.role === 'assistant'
+    );
+    
+    if (outputMessage && 'content' in outputMessage) {
+      const textContent = outputMessage.content.find(
+        item => item.type === 'output_text'
+      );
+      
+      if (textContent && 'text' in textContent) {
+        return textContent.text;
+      }
+    }
+    
+    throw new Error('No valid response content found');
   } catch (error: any) {
     console.error('Error generating chat completion:', error.message)
     throw new Error(`Failed to generate response: ${error.message}`)
@@ -55,18 +83,30 @@ export const generateStreamingChatCompletion = async (
   settings: ChatSettings = DEFAULT_SETTINGS
 ) => {
   try {
-    const response = await openai.chat.completions.create({
+    // Extract system message if present
+    const systemMessage = messages.find(msg => msg.role === 'system');
+    const otherMessages = messages.filter(msg => msg.role !== 'system');
+    
+    // Format the input for responses API
+    const input = otherMessages.map(msg => msg.content).join('\n\n');
+    
+    const response = await openai.responses.create({
       model: settings.model,
-      messages,
+      input: input,
       temperature: settings.temperature,
-      stream: true
-    })
+      instructions: systemMessage?.content || null,
+      stream: true,
+      text: {
+        format: {
+          type: "text"
+        }
+      }
+    });
 
-    // TODO: Fix
-    const stream = OpenAIStream(response as any)
-
-    return new StreamingTextResponse(stream)
-
+    // Create a stream from the response
+    const stream = OpenAIStream(response as any);
+    
+    return new StreamingTextResponse(stream);
   } catch (error: any) {
     console.error('Error generating streaming chat completion:', error.message)
     throw new Error(`Failed to generate streaming response: ${error.message}`)
