@@ -1,5 +1,30 @@
 import { supabase } from "../lib/supabase-client"
 import { TablesInsert, TablesUpdate } from "../types/database"
+import { v4 as uuidv4 } from 'uuid'
+
+// Service role client import for admin operations
+import { createClient } from '@supabase/supabase-js'
+import { Database } from '../types/database'
+import dotenv from 'dotenv'
+
+dotenv.config()
+
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// Create a Supabase client with the service role key to bypass RLS for admin operations
+const serviceSupabase = supabaseUrl && supabaseServiceKey
+  ? createClient<Database>(
+      supabaseUrl,
+      supabaseServiceKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+  : null;
 
 export const getChatById = async (chatId: string) => {
   const { data: chat, error } = await supabase
@@ -38,6 +63,35 @@ export const createChat = async (chat: TablesInsert<"chats">) => {
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  return createdChat
+}
+
+/**
+ * Create a chat with admin privileges (bypasses RLS)
+ * Use this when creating chats on behalf of users
+ */
+export const createChatAdmin = async (chat: Omit<TablesInsert<"chats">, "id">) => {
+  if (!serviceSupabase) {
+    throw new Error('Service role client not initialized. Check your environment variables.')
+  }
+
+  const chatWithDefaults = {
+    id: uuidv4(),
+    ...chat,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+
+  const { data: createdChat, error } = await serviceSupabase
+    .from("chats")
+    .insert([chatWithDefaults])
+    .select("*")
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to create chat: ${error.message}`)
   }
 
   return createdChat

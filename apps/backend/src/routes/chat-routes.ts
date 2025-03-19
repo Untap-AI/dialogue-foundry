@@ -1,8 +1,9 @@
 import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { getChatById, getChatsByUserId, createChat, updateChat, deleteChat } from '../db/chats'
-import { getMessagesByChatId, createMessage, getLatestSequenceNumber } from '../db/messages'
+import { getChatById, getChatsByUserId, createChat, updateChat, deleteChat, createChatAdmin } from '../db/chats'
+import { getMessagesByChatId, createMessage, getLatestSequenceNumber, createMessagesAdmin, createMessageAdmin } from '../db/messages'
 import { generateChatCompletion, Message, ChatSettings, DEFAULT_SETTINGS } from '../services/openai-service'
+import { Tables } from '../types/database'
 
 const router = express.Router()
 
@@ -37,21 +38,66 @@ router.get('/:chatId', async (req, res) => {
 // Create a new chat
 router.post('/', async (req, res) => {
   try {
-    const { userId, name, model = DEFAULT_SETTINGS.model, temperature = DEFAULT_SETTINGS.temperature } = req.body
+    // TODO: Do we need user id here?
+    const { userId, name, model = DEFAULT_SETTINGS.model, temperature = DEFAULT_SETTINGS.temperature, initialMessage } = req.body
     
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' })
-    }
+    // Generate a new user ID if not provided
+    const generatedUserId = userId ?? uuidv4()
     
-    const newChat = await createChat({
-      user_id: userId,
+    // Create the chat using the admin function to bypass RLS
+    const newChat = await createChatAdmin({
+      user_id: generatedUserId,
       name: name || 'New Chat',
       model,
       temperature
     })
     
-    res.status(201).json(newChat)
+    let messages: Tables<"messages">[] = []
+    
+    // If an initial message is provided, create it along with an AI response
+    if (initialMessage && newChat) {
+      // Get the next sequence number (should be 1 for a new chat)
+      const nextSequenceNumber = 1
+      
+      // Save the user message using admin function to bypass RLS
+      const userMessage = await createMessageAdmin({
+        chat_id: newChat.id,
+        user_id: generatedUserId,
+        content: initialMessage,
+        role: 'user',
+        model,
+        sequence_number: nextSequenceNumber
+      })
+      
+      // Prepare messages for OpenAI API
+      const openaiMessages: Message[] = [{
+        role: 'user',
+        content: initialMessage
+      }]
+      
+      // Generate response from OpenAI
+      const aiResponseContent = await generateChatCompletion(openaiMessages, { model, temperature })
+      
+      // Save the AI response using admin function to bypass RLS
+      const aiMessage = await createMessageAdmin({
+        chat_id: newChat.id,
+        user_id: generatedUserId,
+        content: aiResponseContent || 'Sorry, I was unable to generate a response.',
+        role: 'assistant',
+        model,
+        sequence_number: nextSequenceNumber + 1
+      })
+      
+      messages = [userMessage, aiMessage] as Tables<"messages">[]
+    }
+    
+    res.status(201).json({
+      chat: newChat,
+      messages,
+      userId: generatedUserId // Include the user ID in the response
+    })
   } catch (error: any) {
+    console.error('Error creating chat:', error)
     res.status(500).json({ error: error.message })
   }
 })
@@ -114,8 +160,8 @@ router.post('/:chatId/messages', async (req, res) => {
     const latestSequenceNumber = await getLatestSequenceNumber(chatId)
     const nextSequenceNumber = latestSequenceNumber + 1
     
-    // Save the user message
-    const userMessage = await createMessage({
+    // Save the user message using admin function to bypass RLS
+    const userMessage = await createMessageAdmin({
       chat_id: chatId,
       user_id: userId,
       content,
@@ -139,8 +185,8 @@ router.post('/:chatId/messages', async (req, res) => {
     // Generate response from OpenAI
     const aiResponseContent = await generateChatCompletion(openaiMessages, chatSettings)
     
-    // Save the AI response
-    const aiMessage = await createMessage({
+    // Save the AI response using admin function to bypass RLS
+    const aiMessage = await createMessageAdmin({
       chat_id: chatId,
       user_id: userId,
       content: aiResponseContent || 'Sorry, I was unable to generate a response.',

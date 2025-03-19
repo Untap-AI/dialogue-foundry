@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import dotenv from 'dotenv'
+import { OpenAIStream, StreamingTextResponse } from 'ai'
 
 dotenv.config()
 
@@ -25,7 +26,8 @@ export type ChatSettings = {
 
 // Default settings to use if none are provided
 export const DEFAULT_SETTINGS: ChatSettings = {
-  model: 'gpt-3.5-turbo',
+  // TODO: Assess model performance
+  model: 'gpt-4o',
   temperature: 0.7
 }
 
@@ -53,14 +55,18 @@ export const generateStreamingChatCompletion = async (
   settings: ChatSettings = DEFAULT_SETTINGS
 ) => {
   try {
-    const stream = await openai.chat.completions.create({
+    const response = await openai.chat.completions.create({
       model: settings.model,
       messages,
       temperature: settings.temperature,
       stream: true
     })
 
-    return stream
+    // TODO: Fix
+    const stream = OpenAIStream(response as any)
+
+    return new StreamingTextResponse(stream)
+
   } catch (error: any) {
     console.error('Error generating streaming chat completion:', error.message)
     throw new Error(`Failed to generate streaming response: ${error.message}`)
