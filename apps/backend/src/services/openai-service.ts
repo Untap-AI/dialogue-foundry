@@ -192,7 +192,8 @@ export const generateChatCompletion = async (
 
 export const generateStreamingChatCompletion = async (
   messages: Message[],
-  settings: ChatSettings = DEFAULT_SETTINGS
+  settings: ChatSettings = DEFAULT_SETTINGS,
+  onChunk: (chunk: string) => void
 ) => {
   try {
     // Extract system message if present
@@ -218,98 +219,22 @@ export const generateStreamingChatCompletion = async (
       }
     });
     
-    console.log('Got streaming response from OpenAI');
-    
-    // Create a ReadableStream that properly formats the OpenAI response chunks
-    const stream = new ReadableStream({
-      async start(controller) {
-        console.log('Stream started');
-        
-        try {
-          // Process each chunk of the response
-          for await (const rawChunk of response) {
-            // Cast the chunk to our custom type for better TypeScript support
+    for await (const rawChunk of response) {
             const chunk = rawChunk as OpenAIResponseChunk;
-            console.log('Received chunk type:', chunk.type);
-            
-            // Extract text based on the actual chunk structure from OpenAI
+            console.log('Received chunk:', chunk);
+
             let text = '';
-            
-            try {
-              // Handle different event types based on the logs
-              switch (chunk.type) {
-                case 'response.output_text.delta': {
-                  // These are the actual text tokens we want to stream to the client
-                  const deltaChunk = chunk as OpenAIResponseDeltaChunk;
-                  text = deltaChunk.delta;
-                  console.log('Extracted delta text:', text);
-                  break;
-                }
-                
-                case 'response.output_text.done': {
-                  // This contains the full text at the end - we don't need to stream it again
-                  const doneChunk = chunk as OpenAIResponseDoneChunk;
-                  console.log('Full text received in done event (not streaming again):', doneChunk.text.substring(0, 50) + '...');
-                  break;
-                }
-                
-                case 'response.content_part.done': {
-                  // This is another form of the completed text
-                  const contentDoneChunk = chunk as OpenAIResponseContentPartDoneChunk;
-                  console.log('Content part done received (not streaming):', 
-                    contentDoneChunk.part.text ? 
-                      contentDoneChunk.part.text.substring(0, 50) + '...' : 
-                      'No text');
-                  break;
-                }
-                
-                case 'response.created':
-                case 'response.in_progress':
-                case 'response.output_item.added':
-                case 'response.content_part.added':
-                case 'response.output_item.done':
-                case 'response.completed': {
-                  // These are metadata events that don't contain streamed text
-                  console.log('Received metadata event:', chunk.type);
-                  break;
-                }
-                
-                default: {
-                  console.log('Unhandled event type:', chunk.type);
-                  break;
-                }
-              }
-              
-              // Only send non-empty text chunks
-              if (text) {
-                console.log('Sending text chunk:', text);
-                const sseMessage = `data: ${JSON.stringify({ content: text })}\n\n`;
-                controller.enqueue(new TextEncoder().encode(sseMessage));
-              }
-            } catch (extractError) {
-              console.error('Error extracting text from chunk:', extractError);
+
+            if (chunk.type === 'response.output_text.delta') {
+              const deltaChunk = chunk as OpenAIResponseDeltaChunk;
+              text = deltaChunk.delta || '';
+              console.log('Extracted delta text:', text);
+            }
+
+            if (text) {
+              onChunk(text);
             }
           }
-          
-          // End the stream with a DONE message
-          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-          controller.close();
-          console.log('Stream closed');
-        } catch (error) {
-          console.error('Error during streaming:', error);
-          controller.error(error);
-        }
-      }
-    });
-    
-    // Set the proper headers for SSE
-    const headers = new Headers();
-    headers.set('Content-Type', 'text/event-stream');
-    headers.set('Cache-Control', 'no-cache');
-    headers.set('Connection', 'keep-alive');
-    
-    // Return the stream as a Response object
-    return new Response(stream, { headers });
   } catch (error: any) {
     console.error('Error generating streaming chat completion:', error.message);
     throw new Error(`Failed to generate streaming response: ${error.message}`);

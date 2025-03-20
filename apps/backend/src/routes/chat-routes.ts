@@ -270,12 +270,21 @@ async function handleStreamRequest(req: express.Request, res: express.Response) 
     });
     
     console.log('Generating streaming response for chat:', chatId);
+
+    const onChunk = (chunk: string) => {
+      res.write(chunk);
+    }
     
     // Generate streaming response from OpenAI
-    const streamingResponse = await generateStreamingChatCompletion(openaiMessages, chatSettings);
-    
-    // Use res.send() to properly send the streaming response through Express
-    return res.send(streamingResponse);
+    await generateStreamingChatCompletion(openaiMessages, chatSettings, onChunk);
+
+    res.end();
+
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log('Client disconnected');
+      res.end();
+    });
   } catch (error: any) {
     console.error('Error in streaming chat message endpoint:', error);
     // Only send error response if headers haven't been sent yet
