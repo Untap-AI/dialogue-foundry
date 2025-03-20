@@ -13,27 +13,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          model: string
           name: string
-          temperature: number
           updated_at: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          model: string
           name: string
-          temperature: number
           updated_at?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          model?: string
           name?: string
-          temperature?: number
           updated_at?: string | null
           user_id?: string
         }
@@ -45,7 +39,6 @@ export type Database = {
           content: string
           created_at: string
           id: string
-          model: string
           role: string
           sequence_number: number
           title: string | null
@@ -57,7 +50,6 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
-          model: string
           role: string
           sequence_number: number
           title?: string | null
@@ -69,7 +61,6 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
-          model?: string
           role?: string
           sequence_number?: number
           title?: string | null

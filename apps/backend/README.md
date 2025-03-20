@@ -1,6 +1,71 @@
-# Chatbot Backend
+# Backend Service
 
-A simple backend for a chatbot application that can be embedded on a small company website. It allows users to interact with an AI chatbot and maintains chat history.
+This is the backend service for Dialogue Foundry, providing API endpoints and database connectivity.
+
+## Supabase Configuration
+
+The application uses Supabase for database and authentication services.
+
+### Local Development
+
+1. Make sure Docker is installed and running
+2. Start the local Supabase instance:
+   ```bash
+   npx supabase start
+   ```
+3. Apply database migrations:
+   ```bash
+   sh scripts/apply-migrations.sh
+   ```
+4. Access the Supabase Studio at http://localhost:54323
+
+### Production Setup
+
+1. Create a project on [Supabase](https://supabase.com)
+2. Copy `.env.production.example` to `.env.production` and fill in your Supabase project credentials
+3. Apply migrations to your remote database:
+   ```bash
+   npx supabase link --project-ref your-project-ref
+   npx supabase db push
+   ```
+
+## Environment Variables
+
+The application uses different environment files based on the `NODE_ENV`:
+
+- `.env.local` - Local development (Docker)
+- `.env.production` - Production deployment
+- `.env.staging` - Staging deployment (optional)
+
+## Authentication System
+
+The application uses JWT tokens for secure chat access:
+
+1. When a user creates a new chat, they receive a JWT token
+2. This token must be included in the Authorization header for subsequent requests
+3. The token contains the chat ID and user ID, ensuring only authorized users can access their chats
+
+Example:
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+JWT Configuration in environment files:
+```
+JWT_SECRET=your-secret-key
+JWT_EXPIRY=86400  # 24 hours in seconds
+```
+
+## Running the Application
+
+```bash
+# Development
+npm run dev
+
+# Production
+npm run build
+npm start
+```
 
 ## Features
 
@@ -9,6 +74,7 @@ A simple backend for a chatbot application that can be embedded on a small compa
 - Integration with OpenAI for AI responses
 - User identification to maintain chat history between sessions
 - CORS protection for security
+- JWT-based authentication for secure chat access
 
 ## Requirements
 
@@ -16,55 +82,19 @@ A simple backend for a chatbot application that can be embedded on a small compa
 - Supabase account (for database)
 - OpenAI API key
 
-## Getting Started
-
-### 1. Set up Supabase
-
-1. Create a new project on [Supabase](https://supabase.com/)
-2. Apply the database schema found in `supabase/schema.sql` using the SQL editor in Supabase
-
-### 2. Configure Environment Variables
-
-1. Copy `.env.example` to `.env`
-2. Fill in the required environment variables:
-   - `SUPABASE_URL`: Your Supabase project URL
-   - `SUPABASE_ANON_KEY`: Your Supabase anonymous key
-   - `OPENAI_API_KEY`: Your OpenAI API key
-   - `PORT`: The port to run the server on (default: 3000)
-   - `ALLOWED_ORIGINS`: Comma-separated list of allowed origins for CORS
-
-### 3. Install Dependencies
-
-```bash
-npm install
-```
-
-### 4. Build and Run the Server
-
-For development:
-```bash
-npm run dev
-```
-
-For production:
-```bash
-npm run build
-npm start
-```
-
 ## API Endpoints
 
 ### Chats
 
-- `GET /api/chats/user/:userId` - Get all chats for a user
-- `GET /api/chats/:chatId` - Get a chat by ID with its messages
-- `POST /api/chats` - Create a new chat
-- `PUT /api/chats/:chatId` - Update a chat
-- `DELETE /api/chats/:chatId` - Delete a chat
+- `GET /api/chats/user/:userId` - Get all chats for a user (requires authentication)
+- `GET /api/chats/:chatId` - Get a chat by ID with its messages (requires chat-specific token)
+- `POST /api/chats` - Create a new chat and receive an access token
+- `PUT /api/chats/:chatId` - Update a chat (requires chat-specific token)
+- `DELETE /api/chats/:chatId` - Delete a chat (requires chat-specific token)
 
 ### Messages
 
-- `POST /api/chats/:chatId/messages` - Send a message and get an AI response
+- `POST /api/chats/:chatId/messages` - Send a message and get an AI response (requires chat-specific token)
 
 ## Integration with NLUX
 
@@ -72,11 +102,19 @@ This backend is designed to work with NLUX for the frontend. Here's a basic exam
 
 ```javascript
 import { createChatUi } from '@nlux/react';
+import { createChat, getChat, sendMessage } from '../utils/chat-client';
 
+// First create a chat and get the token
+const { chat, accessToken } = await createChat('user-123', 'New Chat');
+
+// Configure NLUX with your custom API functions
 const chatUi = createChatUi({
-  apiUrl: 'http://localhost:3000/api/chats',
-  userId: 'user-123', // Replace with your user identification system
-  onError: (error) => console.error('Chat error:', error)
+  customApi: {
+    sendMessage: async (message) => {
+      const response = await sendMessage(chat.id, message);
+      return response.aiMessage.content;
+    }
+  }
 });
 
 // In your React component

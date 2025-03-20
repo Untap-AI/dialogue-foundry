@@ -23,9 +23,7 @@ CREATE TABLE IF NOT EXISTS chats (
     updated_at TIMESTAMPTZ,
     
     -- REQUIRED
-    name TEXT NOT NULL CHECK (char_length(name) <= 500),
-    model TEXT NOT NULL CHECK (char_length(model) <= 100),
-    temperature DOUBLE PRECISION NOT NULL CHECK (temperature >= 0 AND temperature <= 2)
+    name TEXT NOT NULL CHECK (char_length(name) <= 500)
 );
 
 -- Create indexes for chats
@@ -47,7 +45,6 @@ CREATE TABLE IF NOT EXISTS messages (
     -- REQUIRED
     content TEXT NOT NULL CHECK (char_length(content) <= 100000),
     role TEXT NOT NULL CHECK (char_length(role) <= 100),
-    model TEXT NOT NULL CHECK (char_length(model) <= 100),
     sequence_number INT NOT NULL
 );
 

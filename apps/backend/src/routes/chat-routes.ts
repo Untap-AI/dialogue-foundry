@@ -1,27 +1,45 @@
 import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { getChatById, getChatsByUserId, createChat, updateChat, deleteChat, createChatAdmin } from '../db/chats'
-import { getMessagesByChatId, createMessage, getLatestSequenceNumber, createMessagesAdmin, createMessageAdmin } from '../db/messages'
-import { generateChatCompletion, Message, ChatSettings, DEFAULT_SETTINGS } from '../services/openai-service'
-import { Tables } from '../types/database'
+import { getChatById, getChatsByUserId, updateChat, deleteChat, createChatAdmin } from '../db/chats'
+import { getMessagesByChatId, getLatestSequenceNumber, createMessageAdmin } from '../db/messages'
+import { generateChatCompletion, generateStreamingChatCompletion, Message, ChatSettings, DEFAULT_SETTINGS } from '../services/openai-service'
+import { generateChatAccessToken } from '../lib/jwt-utils'
+import { authenticateChatAccess, authenticateUser } from '../middleware/auth-middleware'
 
 const router = express.Router()
 
-// Get all chats for a user
-router.get('/user/:userId', async (req, res) => {
+// Get all chats for a user (requires user authentication)
+router.get('/user/:userId', authenticateUser, async (req, res) => {
   try {
+    // Ensure the requesting user can only access their own chats
     const { userId } = req.params
+    
+    // Ensure userId is a string
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' })
+    }
+    
+    // Check if the authenticated user is requesting their own chats
+    if (req.user?.userId !== userId) {
+      return res.status(403).json({ error: 'You can only access your own chats' })
+    }
+    
     const chats = await getChatsByUserId(userId)
-    res.json(chats)
+    return res.json(chats)
   } catch (error: any) {
-    res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: error.message })
   }
 })
 
-// Get a chat by ID with its messages
-router.get('/:chatId', async (req, res) => {
+// Get a chat by ID with its messages (requires chat-specific authentication)
+router.get('/:chatId', authenticateChatAccess, async (req, res) => {
   try {
     const { chatId } = req.params
+    
+    if (!chatId) {
+      return res.status(400).json({ error: 'Chat ID is required' })
+    }
+    
     const chat = await getChatById(chatId)
     
     if (!chat) {
@@ -29,17 +47,16 @@ router.get('/:chatId', async (req, res) => {
     }
     
     const messages = await getMessagesByChatId(chatId)
-    res.json({ chat, messages })
+    return res.json({ chat, messages })
   } catch (error: any) {
-    res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: error.message })
   }
 })
 
-// Create a new chat
+// Create a new chat and return access token
 router.post('/', async (req, res) => {
   try {
-    // TODO: Do we need user id here?
-    const { userId, name, model = DEFAULT_SETTINGS.model, temperature = DEFAULT_SETTINGS.temperature } = req.body
+    const { userId, name } = req.body
     
     // Generate a new user ID if not provided
     const generatedUserId = userId ?? uuidv4()
@@ -47,56 +64,75 @@ router.post('/', async (req, res) => {
     // Create the chat using the admin function to bypass RLS
     const newChat = await createChatAdmin({
       user_id: generatedUserId,
-      name: name || 'New Chat',
-      model,
-      temperature
+      name: name || 'New Chat'
     })
     
-    res.status(201).json(newChat)
+    // Generate access token for this chat
+    const token = generateChatAccessToken(newChat.id, generatedUserId)
+    
+    return res.status(201).json({
+      chat: newChat,
+      accessToken: token
+    })
   } catch (error: any) {
     console.error('Error creating chat:', error)
-    res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: error.message })
   }
 })
 
-// Update a chat
-router.put('/:chatId', async (req, res) => {
+// Update a chat (requires chat-specific authentication)
+router.put('/:chatId', authenticateChatAccess, async (req, res) => {
   try {
     const { chatId } = req.params
-    const { name, model, temperature } = req.body
+    
+    if (!chatId) {
+      return res.status(400).json({ error: 'Chat ID is required' })
+    }
+    
+    const { name } = req.body
     
     const updatedChat = await updateChat(chatId, {
-      name, 
-      model, 
-      temperature,
+      name,
       updated_at: new Date().toISOString()
     })
     
-    res.json(updatedChat)
+    return res.json(updatedChat)
   } catch (error: any) {
-    res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: error.message })
   }
 })
 
-// Delete a chat
-router.delete('/:chatId', async (req, res) => {
+// Delete a chat (requires chat-specific authentication)
+router.delete('/:chatId', authenticateChatAccess, async (req, res) => {
   try {
     const { chatId } = req.params
+    
+    if (!chatId) {
+      return res.status(400).json({ error: 'Chat ID is required' })
+    }
+    
     await deleteChat(chatId)
-    res.json({ success: true })
+    return res.json({ success: true })
   } catch (error: any) {
-    res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: error.message })
   }
 })
 
-// Send a message and get a response
-router.post('/:chatId/messages', async (req, res) => {
+// Send a message and get a response (requires chat-specific authentication)
+router.post('/:chatId/messages', authenticateChatAccess, async (req, res) => {
   try {
     const { chatId } = req.params
-    const { userId, content, model, temperature } = req.body
+    const { content, model, temperature } = req.body
+    
+    if (!chatId) {
+      return res.status(400).json({ error: 'Chat ID is required' })
+    }
+    
+    // Use the authenticated user's ID from the JWT token
+    const userId = req.user?.userId
     
     if (!userId || !content) {
-      return res.status(400).json({ error: 'User ID and content are required' })
+      return res.status(400).json({ error: 'User authentication and message content are required' })
     }
     
     const chat = await getChatById(chatId)
@@ -104,10 +140,10 @@ router.post('/:chatId/messages', async (req, res) => {
       return res.status(404).json({ error: 'Chat not found' })
     }
     
-    // Get chat settings
+    // Get chat settings - using request parameters or defaults
     const chatSettings: ChatSettings = {
-      model: model || chat.model,
-      temperature: temperature || chat.temperature
+      model: model || DEFAULT_SETTINGS.model,
+      temperature: temperature || DEFAULT_SETTINGS.temperature
     }
     
     // Get all previous messages in this chat
@@ -123,7 +159,6 @@ router.post('/:chatId/messages', async (req, res) => {
       user_id: userId,
       content,
       role: 'user',
-      model: chatSettings.model,
       sequence_number: nextSequenceNumber
     })
     
@@ -148,18 +183,106 @@ router.post('/:chatId/messages', async (req, res) => {
       user_id: userId,
       content: aiResponseContent || 'Sorry, I was unable to generate a response.',
       role: 'assistant',
-      model: chatSettings.model,
       sequence_number: nextSequenceNumber + 1
     })
     
-    res.json({
+    return res.json({
       userMessage,
       aiMessage
     })
   } catch (error: any) {
     console.error('Error in chat message endpoint:', error)
-    res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: error.message })
   }
 })
+
+// Send a streaming message and get a response (requires chat-specific authentication)
+// Support both POST and GET methods for compatibility with EventSource
+router.post('/:chatId/stream', authenticateChatAccess, handleStreamRequest);
+router.get('/:chatId/stream', authenticateChatAccess, handleStreamRequest);
+
+// Shared handler function for stream requests
+async function handleStreamRequest(req: express.Request, res: express.Response) {
+  try {
+    const { chatId } = req.params;
+    
+    // Check if token is provided in query parameters (for EventSource)
+    const tokenFromQuery = req.query.token as string;
+    if (tokenFromQuery && !req.headers.authorization) {
+      // Set the Authorization header manually for token from query params
+      req.headers.authorization = `Bearer ${tokenFromQuery}`;
+      console.log('Using token from query parameters for authorization');
+    }
+    
+    // Get content from body (POST) or query params (GET)
+    const content = req.body.content || req.query.content;
+    const model = req.body.model || req.query.model;
+    const temperature = req.body.temperature || req.query.temperature;
+    
+    if (!chatId) {
+      return res.status(400).json({ error: 'Chat ID is required' });
+    }
+    
+    // Use the authenticated user's ID from the JWT token
+    const userId = req.user?.userId;
+    
+    if (!userId || !content) {
+      return res.status(400).json({ error: 'User authentication and message content are required' });
+    }
+    
+    const chat = await getChatById(chatId);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+    
+    // Get chat settings - using request parameters or defaults
+    const chatSettings: ChatSettings = {
+      model: model || DEFAULT_SETTINGS.model,
+      temperature: temperature ? parseFloat(temperature) : DEFAULT_SETTINGS.temperature
+    };
+    
+    // Get all previous messages in this chat
+    const previousMessages = await getMessagesByChatId(chatId);
+    
+    // Get the next sequence number
+    const latestSequenceNumber = await getLatestSequenceNumber(chatId);
+    const nextSequenceNumber = latestSequenceNumber + 1;
+    
+    // Save the user message using admin function to bypass RLS
+    await createMessageAdmin({
+      chat_id: chatId,
+      user_id: userId,
+      content,
+      role: 'user',
+      sequence_number: nextSequenceNumber
+    });
+    
+    // Prepare messages for OpenAI API
+    const openaiMessages: Message[] = previousMessages.map(msg => ({
+      role: msg.role as 'system' | 'user' | 'assistant',
+      content: msg.content
+    }));
+    
+    // Add the new user message
+    openaiMessages.push({
+      role: 'user',
+      content
+    });
+    
+    console.log('Generating streaming response for chat:', chatId);
+    
+    // Generate streaming response from OpenAI
+    const streamingResponse = await generateStreamingChatCompletion(openaiMessages, chatSettings);
+    
+    // Use res.send() to properly send the streaming response through Express
+    return res.send(streamingResponse);
+  } catch (error: any) {
+    console.error('Error in streaming chat message endpoint:', error);
+    // Only send error response if headers haven't been sent yet
+    if (!res.headersSent) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+}
 
 export default router 

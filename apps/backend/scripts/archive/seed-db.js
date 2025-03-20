@@ -20,22 +20,16 @@ const testChats = [
     id: uuidv4(),
     user_id: testUsers[0].id,
     name: 'First Conversation',
-    model: 'gpt-4',
-    temperature: 0.7,
   },
   {
     id: uuidv4(),
     user_id: testUsers[0].id,
     name: 'Technical Chat',
-    model: 'gpt-3.5-turbo',
-    temperature: 0.5,
   },
   {
     id: uuidv4(),
     user_id: testUsers[1].id,
     name: 'Work Meeting',
-    model: 'gpt-4',
-    temperature: 0.8,
   },
 ];
 
@@ -47,7 +41,6 @@ const testMessages = [
     user_id: testUsers[0].id,
     content: 'Hello, how can you help me today?',
     role: 'user',
-    model: 'gpt-4',
     sequence_number: 1,
   },
   {
@@ -56,7 +49,6 @@ const testMessages = [
     user_id: testUsers[0].id,
     content: 'I can help with various tasks like answering questions, drafting emails, explaining concepts, and more. What would you like assistance with?',
     role: 'assistant',
-    model: 'gpt-4',
     sequence_number: 2,
   },
   
@@ -67,7 +59,6 @@ const testMessages = [
     user_id: testUsers[0].id,
     content: 'How do I implement a binary search algorithm?',
     role: 'user',
-    model: 'gpt-3.5-turbo',
     sequence_number: 1,
   },
   {
@@ -76,7 +67,6 @@ const testMessages = [
     user_id: testUsers[0].id,
     content: 'To implement a binary search algorithm...',
     role: 'assistant',
-    model: 'gpt-3.5-turbo',
     sequence_number: 2,
   },
   
@@ -87,7 +77,6 @@ const testMessages = [
     user_id: testUsers[1].id,
     content: 'Can you help me draft an agenda for tomorrow\'s meeting?',
     role: 'user',
-    model: 'gpt-4',
     sequence_number: 1,
   },
   {
@@ -96,7 +85,6 @@ const testMessages = [
     user_id: testUsers[1].id,
     content: 'Certainly! Here\'s a draft agenda...',
     role: 'assistant',
-    model: 'gpt-4',
     sequence_number: 2,
   },
 ];
@@ -140,4 +128,4 @@ async function seedDatabase() {
   }
 }
 
-seedDatabase(); 
+seedDatabase();

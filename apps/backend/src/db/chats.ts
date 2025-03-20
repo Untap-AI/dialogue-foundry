@@ -27,7 +27,10 @@ const serviceSupabase = supabaseUrl && supabaseServiceKey
   : null;
 
 export const getChatById = async (chatId: string) => {
-  const { data: chat, error } = await supabase
+  // Use serviceSupabase to bypass RLS if available, otherwise fall back to regular client
+  const client = serviceSupabase || supabase
+  
+  const { data: chat, error } = await client
     .from("chats")
     .select("*")
     .eq("id", chatId)
