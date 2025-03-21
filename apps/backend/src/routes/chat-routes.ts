@@ -281,7 +281,7 @@ async function handleStreamRequest(req: express.Request, res: express.Response) 
     res.end();
 
     // Handle client disconnect
-    req.on('close', () => {
+    return req.on('close', () => {
       console.log('Client disconnected');
       res.end();
     });
@@ -291,6 +291,8 @@ async function handleStreamRequest(req: express.Request, res: express.Response) 
     if (!res.headersSent) {
       return res.status(500).json({ error: error.message });
     }
+
+    return res.status(500).json({ error: error.message });
   }
 }
 
