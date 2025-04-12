@@ -44,20 +44,22 @@ export const retrieveDocuments = async (
       cacheService.setPineconeIndex(indexName, index)
     }
 
+    // First retrieve top 20 results from Pinecone
+    const INITIAL_RESULTS = 20
+    
     // Query the Pinecone index with the text query feature
     // This uses serverless Pinecone with auto-embedding
     const queryResponse = await index.searchRecords({
       query: {
-        topK: topK ?? 5,
+        topK: INITIAL_RESULTS,
         inputs: { text: query },
         filter
-        // TODO: Add reranking
       },
       fields: ['chunk_text'] // Only request chunk_text and url
     })
 
-    // Extract and format the results with URL
-    const documents = queryResponse.result.hits
+    // Extract the results with text
+    const initialDocuments = queryResponse.result.hits
       .map(hit => {
         const fields = hit.fields
         if (!('chunk_text' in fields) || !fields.chunk_text || typeof fields.chunk_text !== 'string') return undefined
@@ -66,9 +68,44 @@ export const retrieveDocuments = async (
           text: fields.chunk_text,
         }
       })
-      .filter((doc) => doc !== undefined)
+      .filter((doc): doc is RetrievedDocument => doc !== undefined)
 
-    return documents
+    // If we have documents to rerank, use Cohere rerank through Pinecone's inference API
+    if (initialDocuments.length > 0) {
+      try {
+        console.log(`Initial retrieval returned ${initialDocuments.length} documents`)
+        const documentsToRerank = initialDocuments.map(doc => doc.text)
+        
+        // Use Pinecone's inference API to rerank with Cohere
+        console.log(`Reranking with Cohere rerank-3.5 model...`)
+        const rerankResults = await pinecone.inference.rerank(
+          "cohere-rerank-3.5",
+          query,
+          documentsToRerank,
+          {
+            topN: topK || 5,
+            returnDocuments: true
+          }
+        )
+        
+        // Transform results back to our document format
+        if (rerankResults.data) {
+          console.log(`Reranking successful, received ${rerankResults.data.length} reranked results`)
+          const rerankedDocuments = rerankResults.data.map(result => ({
+            text: result.document?.text || ''
+          })).filter(doc => doc.text !== '')
+          
+          return rerankedDocuments
+        }
+      } catch (rerankError) {
+        console.error('Error during Cohere reranking:', rerankError)
+        // Fallback to initial results if reranking fails
+        return initialDocuments.slice(0, topK || 5)
+      }
+    }
+
+    // Fallback to initial results if reranking wasn't successful or no results
+    return initialDocuments.slice(0, topK || 5)
   } catch (error) {
     console.error('Error retrieving documents from Pinecone:', error)
     return []
