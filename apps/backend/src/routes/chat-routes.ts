@@ -446,7 +446,7 @@ async function handleStreamRequest(req: CustomRequest, res: express.Response) {
         error: streamError as Error,
         chatId
       })
-      aiResponseContent = '' // Fallback to empty string on error
+      throw streamError
     }
 
     await createMessageAdmin({
