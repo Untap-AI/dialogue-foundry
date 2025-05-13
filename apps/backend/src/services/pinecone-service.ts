@@ -32,7 +32,7 @@ type RetrievedDocument = {
 export const retrieveDocuments = async (
   indexName: string,
   query: string,
-  topK: number = 5,
+  topK: number = 10,
   filter?: Record<string, unknown>
 ) => {
   try {
@@ -48,7 +48,7 @@ export const retrieveDocuments = async (
     // This uses serverless Pinecone with auto-embedding
     const queryResponse = await index.searchRecords({
       query: {
-        topK: topK ?? 5,
+        topK,
         inputs: { text: query },
         filter
         // TODO: Add reranking
