@@ -37,7 +37,7 @@ export type ChatSettings = {
 
 // Default settings to use if none are provided
 export const DEFAULT_SETTINGS: Pick<ChatSettings, 'model' | 'temperature'> = {
-  model: 'gpt-4o',
+  model: 'gpt-4.1',
   temperature: 0.5
 }
 
@@ -235,7 +235,9 @@ export const generateStreamingChatCompletion = async (
       MAX_MESSAGES_PER_CHAT
     )
 
-    const systemPromptWithCurrentDate = `Respond using Markdown formatting for headings, lists, and emphasis for all answers.\n\n${settings.systemPrompt}\n\nThe current date and time is ${new Date().toLocaleString(
+    const systemPromptWithCurrentDate = `Respond using Markdown formatting for headings, lists, and emphasis for all answers.
+    
+    ${settings.systemPrompt}\n\nThe current date and time is ${new Date().toLocaleString(
       'en-US',
       {
         weekday: 'long',
@@ -246,7 +248,10 @@ export const generateStreamingChatCompletion = async (
         minute: 'numeric',
         timeZone: settings.timezone || 'UTC'
       }
-    )}.`
+    )}.
+    
+    Respond using Markdown formatting for headings, lists, and emphasis for all answers.
+    `
 
     // Configure request options with tools if email function is enabled
     const requestOptions = {
