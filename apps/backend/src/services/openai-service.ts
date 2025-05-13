@@ -2,22 +2,28 @@ import OpenAI from 'openai'
 import dotenv from 'dotenv'
 import { MAX_MESSAGES_PER_CHAT } from '../db/messages'
 import { sendInquiryEmail } from './sendgrid-service'
+// Import necessary types for chat completions
 import type {
-  ResponseCreateParams,
-  ResponseFunctionToolCall
-} from 'openai/resources/responses/responses.mjs'
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionChunk,
+  ChatCompletionMessageToolCall
+} from 'openai/resources/chat/completions.mjs'
 import type { EmailData } from './sendgrid-service'
 
 dotenv.config()
 
-const apiKey = process.env.OPENAI_API_KEY
+const claudeApiKey = process.env.CLAUDE_API_KEY
+const claudeApiBaseUrl = 'https://api.anthropic.com/v1/'
 
-if (!apiKey) {
-  throw new Error('OPENAI_API_KEY is not set in environment variables')
+if (!claudeApiKey) {
+  throw new Error('CLAUDE_API_KEY is not set in environment variables')
 }
 
 const openai = new OpenAI({
-  apiKey
+  apiKey: claudeApiKey,
+  baseURL: claudeApiBaseUrl
 })
 
 // TODO: Is there a utility type somewhere that we can use for this?
@@ -37,38 +43,39 @@ export type ChatSettings = {
 
 // Default settings to use if none are provided
 export const DEFAULT_SETTINGS: Pick<ChatSettings, 'model' | 'temperature'> = {
-  model: 'gpt-4o',
+  model: 'claude-3-7-sonnet-20250219',
   temperature: 0.5
 }
 
-// Define the email tool for OpenAI function calling
+// Define the email tool for OpenAI function calling - structure is compatible with chat completions
 const emailTool = {
   type: 'function',
-  name: 'send_email',
-  description:
-    'Send an email to the company with user contact information and conversation details. This should only be used if the user has explicitly consented to sending an email and provided their email address.',
-  parameters: {
-    type: 'object',
-    properties: {
-      subject: {
-        type: 'string',
-        description: 'The subject of the email'
+  function: {
+    name: 'send_email',
+    description:
+      'Send an email to the company with user contact information and conversation details. This should only be used if the user has explicitly consented to sending an email and provided their email address.',
+    parameters: {
+      type: 'object',
+      properties: {
+        subject: {
+          type: 'string',
+          description: 'The subject of the email'
+        },
+        userEmail: {
+          type: 'string',
+          description: 'The email address of the user to contact them'
+        },
+        conversationSummary: {
+          type: 'string',
+          description:
+            'A brief summary of what the user is looking for or needs help with'
+        }
       },
-      userEmail: {
-        type: 'string',
-        description: 'The email address of the user to contact them'
-      },
-      conversationSummary: {
-        type: 'string',
-        description:
-          'A brief summary of what the user is looking for or needs help with'
-      }
-    },
-    required: ['userEmail', 'conversationSummary', 'subject'],
-    additionalProperties: false
-  },
-  strict: true
-} as const satisfies NonNullable<ResponseCreateParams['tools']>[number]
+      required: ['userEmail', 'conversationSummary', 'subject'],
+      additionalProperties: false
+    }
+  }
+} as const satisfies ChatCompletionTool
 
 /**
  * Limits the conversation context to the specified maximum number of messages
@@ -95,24 +102,15 @@ const limitMessagesContext = (
 }
 
 // Function to handle email function calls from OpenAI
+// Update signature to accept function details directly
 const handleFunctionCall = async (
-  functionCall: ResponseFunctionToolCall,
+  functionCall: { name: string; arguments: string },
   messages: Message[],
   companyId: string
-  // TODO: Remove usage of any
 ): Promise<{ success: boolean; details?: any }> => {
   if (functionCall.name === 'send_email') {
     try {
-      // Parse arguments with validation
-      if (!functionCall.arguments) {
-        console.error('Function arguments are empty')
-        return {
-          success: false,
-          // TODO: Make error codes type safe
-          details: { error: 'MISSING_ARGUMENTS' }
-        }
-      }
-
+      // Arguments are already a string, parse directly
       const args = JSON.parse(functionCall.arguments)
 
       // Validate required fields
@@ -172,9 +170,11 @@ const handleFunctionCall = async (
     }
   }
 
+  // Handle other potential function calls here if needed
+  console.warn(`Unhandled function call: ${functionCall.name}`)
   return {
     success: false,
-    details: { error: 'NO_FUNCTION_CALLS' }
+    details: { error: 'UNKNOWN_FUNCTION_CALL', functionName: functionCall.name }
   }
 }
 
@@ -226,16 +226,18 @@ export const generateStreamingChatCompletion = async (
   messages: Message[],
   settings: ChatSettings,
   onChunk: (chunk: string) => void
-) => {
-  // TODO: Implement token checking and context cutoff
+): Promise<string> => { // Ensure return type reflects full accumulated text
   try {
-    // Limit the number of messages to avoid exceeding token limits
     const limitedMessages = limitMessagesContext(
       messages,
       MAX_MESSAGES_PER_CHAT
     )
 
-    const systemPromptWithCurrentDate = `Respond using Markdown formatting for headings, lists, and emphasis for all answers.\n\n${settings.systemPrompt}\n\nThe current date and time is ${new Date().toLocaleString(
+    const systemPromptWithCurrentDate = `Respond using Markdown formatting for headings, lists, and emphasis for all answers.
+
+${settings.systemPrompt}
+
+The current date and time is ${new Date().toLocaleString(
       'en-US',
       {
         weekday: 'long',
@@ -246,85 +248,145 @@ export const generateStreamingChatCompletion = async (
         minute: 'numeric',
         timeZone: settings.timezone || 'UTC'
       }
-    )}.`
+    )}.
+    `
 
-    // Configure request options with tools if email function is enabled
-    const requestOptions = {
+    // Prepare messages for chat completions API
+    const chatMessages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPromptWithCurrentDate },
+      // Map existing messages, ensuring correct roles
+      ...limitedMessages.map(msg => ({
+        role: msg.role as 'user' | 'assistant', // Cast assuming only user/assistant after system
+        content: msg.content
+      }))
+    ]
+
+    // Configure request options for chat.completions
+    const requestOptions: ChatCompletionCreateParamsStreaming = {
       model: settings.model,
-      input: limitedMessages,
+      messages: chatMessages,
       temperature: settings.temperature,
-      instructions: systemPromptWithCurrentDate,
       stream: true,
-      text: {
-        format: {
-          type: 'text'
-        }
-      },
+      // Add tools if enabled
       ...(settings.enableEmailFunction ? { tools: [emailTool] } : {})
-    } as const satisfies ResponseCreateParams
+    }
 
-    // Create the response with streaming enabled
-    const response = await openai.responses.create(requestOptions)
+    // Create the chat completion with streaming enabled
+    const response = await openai.chat.completions.create(requestOptions)
 
     let fullText = ''
-    const functionCalls: ResponseFunctionToolCall[] = []
+    // Store tool call chunks by index to reconstruct arguments
+    const toolCallChunks: Record<
+      number,
+      { id?: string; name?: string; arguments?: string }
+    > = {}
 
     try {
       for await (const chunk of response) {
-        let text = ''
+        
+        // Safely check if choices exists and has elements
+        if (!chunk.choices || chunk.choices.length === 0) {
+          // For Claude API, try to find content directly on the chunk
+          // Use type assertion to handle Claude's specific response format
+          const claudeChunk = chunk as any
+          if (claudeChunk.delta || claudeChunk.content) {
+            const content = claudeChunk.delta || claudeChunk.content
+            fullText += content
+            onChunk(content)
+          }
+          continue // Skip this iteration if no valid choices
+        }
+        
+        const delta = chunk.choices[0]?.delta
 
-        // Use our type guard function instead of checking the type directly
-        if (chunk.type === 'response.output_text.delta') {
-          text = 'delta' in chunk ? chunk.delta : ''
+        if (!delta) continue // Skip empty deltas
+
+        // Append text content if present
+        if (delta.content) {
+          fullText += delta.content
+          onChunk(delta.content)
         }
 
-        // Check if this chunk contains function calls
-        if (
-          chunk.type === 'response.output_item.done' &&
-          chunk.item.type === 'function_call'
-        ) {
-          functionCalls.push(chunk.item)
-          // We'll handle function calls after streaming completes
+        // Accumulate tool call information if present
+        if (delta.tool_calls) {
+          for (const toolCallDelta of delta.tool_calls) {
+            const index = toolCallDelta.index
+            if (typeof index !== 'number') continue // Ensure index is valid
+
+            if (!toolCallChunks[index]) {
+              toolCallChunks[index] = { arguments: '' } // Initialize with empty arguments
+            }
+
+            // Store ID and Name if present in the delta
+            if (toolCallDelta.id) {
+              toolCallChunks[index].id = toolCallDelta.id
+            }
+            if (toolCallDelta.function?.name) {
+              toolCallChunks[index].name = toolCallDelta.function.name
+            }
+            // Append argument chunks
+            if (toolCallDelta.function?.arguments) {
+              toolCallChunks[index].arguments += toolCallDelta.function.arguments
+            }
+          }
         }
+      } // End of stream processing loop
 
-        if (text.length > 0) {
-          // Add to full text and send immediately
-          fullText += text
-          onChunk(text)
-        }
-      }
-
-      // Process function calls after streaming completes if detected
-      if (functionCalls.length > 0) {
-        await Promise.all(
-          functionCalls.map(async functionCall => {
-            // Process the function call
-            const result = await handleFunctionCall(
-              functionCall,
-              messages,
-              settings.companyId
-            )
-
-            // Generate and stream a simple follow-up response
-            generateFollowUpResponse(
-              functionCall.name,
-              result,
-              onChunk,
-              text => {
-                fullText += text
-              }
-            )
-          })
+      // Reconstruct and process complete tool calls after streaming
+      const finalToolCalls: ChatCompletionMessageToolCall[] = Object.values(
+        toolCallChunks
+      )
+        // First, filter out chunks that don't have all required fields
+        .filter(
+          (tc): tc is { id: string; name: string; arguments: string } =>
+            tc.id != null && tc.name != null && tc.arguments != null
         )
+        // Then, map the filtered chunks to the correct type structure
+        .map((tc) => ({
+          id: tc.id, // id is now guaranteed to be string
+          type: 'function' as const,
+          function: {
+            name: tc.name, // name is now guaranteed to be string
+            arguments: tc.arguments // arguments is now guaranteed to be string
+          }
+        }))
+
+      // Process function calls if any were fully reconstructed
+      if (finalToolCalls.length > 0) {
+        // Process calls sequentially
+        for (const toolCall of finalToolCalls) {
+          // Pass only the necessary function details to handleFunctionCall
+          const result = await handleFunctionCall(
+            toolCall.function, // Pass the { name, arguments } object
+            messages, // Pass original messages for context
+            settings.companyId
+          )
+
+          // Generate and stream the follow-up response
+          generateFollowUpResponse(
+            toolCall.function.name,
+            result,
+            onChunk,
+            (text) => {
+              fullText += text // Append follow-up response to full text
+            }
+          )
+        }
       }
 
-      return fullText
+      return fullText // Return the accumulated text (including follow-up)
+
     } catch (streamError) {
       console.error('Error during stream processing:', streamError)
-      throw streamError
+      // Consider sending an error message chunk to the client if possible
+      onChunk('\n\n[Error processing response stream]')
+      throw streamError // Re-throw after logging/notifying
     }
   } catch (error) {
     console.error('Error generating streaming chat completion:', error)
-    throw new Error(`Failed to generate streaming response: ${error}`)
+    // Consider sending an error message chunk to the client
+    onChunk('\n\n[Error generating response]')
+    // Ensure a specific error type/message is thrown
+    throw new Error(`Failed to generate streaming response: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
