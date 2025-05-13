@@ -386,6 +386,8 @@ async function handleStreamRequest(req: CustomRequest, res: express.Response) {
       }
     ]
 
+    console.log('pinecone index name', chatConfig?.pinecone_index_name)
+
     // Retrieve relevant documents from Pinecone if an index is configured
     let contextFromDocs = ''
     if (chatConfig?.pinecone_index_name) {
@@ -402,6 +404,8 @@ async function handleStreamRequest(req: CustomRequest, res: express.Response) {
         // Continue without document retrieval if it fails
       }
     }
+
+    console.log('contextFromDocs', contextFromDocs)
 
     // If we retrieved context, add it as a system message
     if (contextFromDocs) {
