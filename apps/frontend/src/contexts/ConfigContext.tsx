@@ -34,38 +34,36 @@ interface DialogueFoundryConfig {
 // Default configuration
 const defaultConfig: DialogueFoundryConfig = {
   chatConfig: {
-    apiBaseUrl: 'http://localhost:3000/api',
-    companyId: 'west-hills-vineyards'
+    apiBaseUrl: 'https://dialogue-foundry-nsi.onrender.com/api',
+    companyId: 'nsi-test'
   },
+  logoUrl: 'http://staging2.gef-sensors.com/wp-content/uploads/2025/05/NSI_small-logo.png',
   personaOptions: {
     assistant: {
-      name: 'Keystone Coachworks Assistant',
-      tagline: 'Ask me anything about Keystone Coachworks'
+      name: 'NSI Assistant',
+      tagline: 'Ask me anything about NSI'
     }
   },
-  logoUrl: "https://keystonecoachworks.net/wp-content/uploads//2017/06/Keystone-logo-wht-grey-no-outline-header.png",
-  popupMessage: "Have questions? Click here for help!",
-  openOnLoad: "desktop-only",
-  welcomeMessage: "Welcome to Keystone Coach Works!\n\nReady to hit the road in style? Whether you're looking to rent, buy, or customize a luxury camper van, I'm here to help.\n\nHave a question? Just ask, or click one of the quick topics below to get started on your next adventure!",
+  popupMessage: 'Have questions? Click here for help!',
+  openOnLoad: 'desktop-only',
+  welcomeMessage: 'Welcome to Nordic Sensors Industrial Inc!\n\nLooking for Gefran sensors, controllers, or automation solutions? Ask anything about our products, availability, or shipping options, and I\'ll help you find what you need. \n\nNeed a suggestion? Try one of the quick topics below to get started.',
   conversationStarters: [
     {
-      label: 'Customization',
-      prompt:
-        'What customization options are available for camper vans at Keystone Coach Works?'
+      label: 'Product Range',
+      prompt: 'What types of Gefran sensors and controllers do you have in stock?'
     },
     {
-      label: 'Rent',
-      prompt: 'How can I rent a camper van and what are the rental rates?'
+      label: 'Availability',
+      prompt: 'Are melt pressure transducers or temperature sensors available for immediate shipping?'
     },
     {
-      label: 'Buy',
-      prompt:
-        'Do you have any camper vans available for sale, and what models do you offer?'
+      label: 'Quote Request',
+      prompt: 'How do I request a quote for Gefran automation components?'
     },
     {
-      label: 'Contact',
-      prompt: 'How can I contact Keystone Coachworks?'
-    },
+      label: 'Shipping',
+      prompt: 'Do you ship Gefran products outside of North America?'
+    }
   ]
 }
 

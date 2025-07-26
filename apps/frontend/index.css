@@ -1,15 +1,15 @@
 :root {
   /* Core colors that can be customized by customers */
-  --df-primary-color: rgb(19, 42, 72);
-  --df-secondary-color: rgb(32, 70, 121);
-  --df-tertiary-color: rgb(28, 46, 55);
+  --df-primary-color: #0C1A33;
+  --df-secondary-color: #009AC7;
+  --df-tertiary-color: #016DB7;
   
   /* Background colors */
   --df-bg-primary: white;
-  --df-bg-secondary: rgb(32, 70, 121);
+  --df-bg-secondary: #F2F7FC;
   
   /* Text colors */
-  --df-text-primary: white;
+  --df-text-primary: black;
   --df-text-secondary: rgb(170, 170, 170);
   --df-text-contrast: white;
   
@@ -45,10 +45,31 @@
   color: black !important;
 }
 
-.nlux-comp-welcomeMessage {
-  color: black !important;
+#dialogue-foundry-app .nlux-comp-conversationStarters button {
+  background-color: var(--df-secondary-color) !important;
 }
 
-#dialogue-foundry-app .email-input {
- color: black !important;
+#dialogue-foundry-app .nlux-comp-conversationStarters button:hover {
+  background-color: var(--df-tertiary-color) !important;
+}
+
+#dialogue-foundry-app .nlux-comp-sendIcon-container {
+  background-color: var(--df-secondary-color) !important;
+}
+
+#dialogue-foundry-app .nlux-comp-sendIcon-container:hover {
+  background-color: var(--df-tertiary-color) !important;
+}
+
+.chat-header-menu {
+  border: none !important;
+}
+
+.chat-header-menu .chat-header-menu-item {
+  background-color: var(--df-secondary-color) !important;
+  border: none !important;
+}
+
+.chat-header-menu .chat-header-menu-item:hover {
+  background-color: var(--df-tertiary-color) !important;
 }
