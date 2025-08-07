@@ -35,7 +35,7 @@ export type ChatSettings = {
 
 // Default settings to use if none are provided
 export const DEFAULT_SETTINGS: Pick<ChatSettings, 'model' | 'temperature'> = {
-  model: 'gpt-4.1',
+  model: 'gpt-5',
   temperature: 0.5
 }
 
@@ -100,6 +100,7 @@ export const generateStreamingChatCompletion = async (
     const requestOptions = {
       model: settings.model,
       input: limitedMessages,
+      verbosity: "low",
       temperature: settings.temperature,
       instructions: systemPromptWithCurrentDate,
       stream: true,

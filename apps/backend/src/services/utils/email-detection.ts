@@ -24,7 +24,7 @@ const openai = new OpenAI({
 })
 
 // Email detection model settings
-const EMAIL_DETECTION_MODEL = 'gpt-4.1-mini'
+const EMAIL_DETECTION_MODEL = 'gpt-5-mini'
 const EMAIL_DETECTION_TEMPERATURE = 0.3
 
 // Tool definition for the email detection LLM
