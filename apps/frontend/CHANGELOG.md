@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.56
+
+### Patch Changes
+
+- Disable input on streaming
+
 ## 0.4.55
 
 ### Patch Changes

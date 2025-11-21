@@ -274,8 +274,9 @@ export const ChatInterface = React.forwardRef<ChatInterfaceRef, ChatInterfacePro
           <PromptInputTextarea
             onChange={(e) => setInput(e.target.value)}
             value={input}
+            disabled={status === 'submitted' || !isInitialized || status === 'streaming'}
           />
-          <PromptInputSubmit disabled={!input || !isInitialized} status={status} />
+          <PromptInputSubmit disabled={!input || !isInitialized || status === 'submitted' || status === 'streaming'} status={status} />
         </PromptInput>
         </div>
       </div>
