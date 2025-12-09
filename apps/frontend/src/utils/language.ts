@@ -1,7 +1,7 @@
 // Supported language codes
-export type SupportedLanguage = 'en' | 'fr' | 'es' | 'pl' | 'nl' | 'it'
+export type SupportedLanguage = 'en' | 'fr' | 'es' | 'pl' | 'nl' | 'it' | 'de'
 
-export const SUPPORTED_LANGUAGES: SupportedLanguage[] = ['en', 'fr', 'es', 'pl', 'nl', 'it']
+export const SUPPORTED_LANGUAGES: SupportedLanguage[] = ['en', 'fr', 'es', 'pl', 'nl', 'it', 'de']
 
 /**
  * Detects the language from the current URL.
@@ -16,9 +16,9 @@ export function detectLanguageFromUrl(): SupportedLanguage | undefined {
 
   const { pathname, search } = window.location
 
-  // Check URL path first (e.g., /fr/, /en/page, /es-MX/)
+  // Check URL path first (e.g., /fr/, /en/page, /es-MX/, /de/)
   // Matches language codes at the start of the path, optionally followed by region code
-  const pathMatch = pathname.match(/^\/(en|fr|es|pl|nl|it)(?:-[A-Z]{2})?(\/|$)/i)
+  const pathMatch = pathname.match(/^\/(en|fr|es|pl|nl|it|de)(?:-[A-Z]{2})?(\/|$)/i)
   if (pathMatch) {
     const lang = pathMatch[1].toLowerCase() as SupportedLanguage
     if (SUPPORTED_LANGUAGES.includes(lang)) {

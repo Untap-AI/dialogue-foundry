@@ -10,6 +10,7 @@ export const DEFAULT_POWERED_BY_TRANSLATIONS: Record<SupportedLanguage, string> 
   pl: 'Obsługiwane przez',
   nl: 'Mogelijk gemaakt door',
   it: 'Offerto da',
+  de: 'Bereitgestellt von',
 }
 
 interface LanguageContextValue {
