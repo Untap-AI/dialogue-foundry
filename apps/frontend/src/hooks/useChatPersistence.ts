@@ -1,9 +1,11 @@
-import { useState, useLayoutEffect, useCallback, useMemo, useEffect } from 'react'
+import { useState, useLayoutEffect, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { ChatApiService } from '../services/api'
 import { logger } from '../services/logger'
 import { DefaultChatTransport, UIMessage } from 'ai'
 import { useConfig } from '../contexts/ConfigContext'
+import { useLanguage } from '../contexts/LanguageContext'
+import type { SupportedLanguage } from '../utils/language'
 
 export type ChatStatus = 'uninitialized' | 'loading' | 'initialized' | 'error'
 
@@ -14,7 +16,11 @@ export function useChatPersistence() {
   const [streamError, setStreamError] = useState<string | null>(null)
 
   const { chatConfig, welcomeMessage } = useConfig()
+  const { currentLanguage } = useLanguage()
   const {apiBaseUrl} = chatConfig
+  
+  // Track previous language to detect changes
+  const previousLanguageRef = useRef<SupportedLanguage | undefined>(currentLanguage)
 
   // Get user's timezone
   const userTimezone = useMemo(() => {
@@ -95,12 +101,66 @@ export function useChatPersistence() {
     }
   }, [chatService, welcomeMessage, chatStatus])
 
+  // Create a new chat (used when language changes)
+  const createNewChat = useCallback(async () => {
+    setChatStatus('loading')
+    
+    try {
+      // Clear existing chat state
+      setChatId(undefined)
+      setInitialMessages([])
+      chat.setMessages([])
+      
+      // Clear storage and create a new chat with the current (localized) welcome message
+      await chatService.startNewChat()
+      
+      // Create new chat with localized welcome message
+      const chatInit = await chatService.createNewChat({ welcomeMessage })
+      
+      // Store initial messages
+      if (chatInit.messages && chatInit.messages.length > 0) {
+        setInitialMessages(chatInit.messages)
+      }
+      
+      // Set the new chat ID
+      setChatId(chatInit.chatId)
+      
+      setChatStatus('initialized')
+    } catch (error) {
+      logger.error('Error creating new chat:', error)
+      setChatStatus('error')
+    }
+  }, [chatService, chat, welcomeMessage])
+
   // Auto-initialize when hook is first used
   useLayoutEffect(() => {
     if (chatStatus === 'uninitialized' && chatConfig) {
       initializeChat()
     }
   }, [chatStatus, chatConfig, initializeChat])
+
+  // Detect language changes and create a new chat
+  useEffect(() => {
+    // Skip if this is the initial render or chat hasn't been initialized yet
+    if (chatStatus === 'uninitialized' || chatStatus === 'loading') {
+      previousLanguageRef.current = currentLanguage
+      return
+    }
+
+    // Check if language has changed
+    if (previousLanguageRef.current !== currentLanguage && chatStatus === 'initialized') {
+      logger.info('Language changed, creating new chat', {
+        previousLanguage: previousLanguageRef.current,
+        newLanguage: currentLanguage
+      })
+      
+      // Create a new chat when language changes
+      createNewChat()
+      
+      // Update the ref to track the new language
+      previousLanguageRef.current = currentLanguage
+    }
+  }, [currentLanguage, chatStatus, createNewChat])
 
   // Clear stream error when a new message starts  
   useEffect(() => {
