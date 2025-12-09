@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useState, useLayoutEffect, useCallback, useMemo, useEffect } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { ChatApiService } from '../services/api'
 import { logger } from '../services/logger'
@@ -155,66 +155,12 @@ export function useChatPersistence() {
     }
   }, [chatService, welcomeMessage, chatStatus, currentLanguage, getStoredChatLanguage, setStoredChatLanguage])
 
-  // Create a new chat (used when language changes)
-  const createNewChat = useCallback(async () => {
-    setChatStatus('loading')
-    
-    try {
-      // Clear existing chat state
-      setChatId(undefined)
-      setInitialMessages([])
-      chat.setMessages([])
-      
-      // Clear storage and create a new chat with the current (localized) welcome message
-      await chatService.startNewChat()
-      
-      // Create new chat with localized welcome message
-      const chatInit = await chatService.createNewChat({ welcomeMessage })
-      
-      // Store initial messages
-      if (chatInit.messages && chatInit.messages.length > 0) {
-        setInitialMessages(chatInit.messages)
-      }
-      
-      // Set the new chat ID
-      setChatId(chatInit.chatId)
-      
-      // Store the current language
-      setStoredChatLanguage(currentLanguage)
-      
-      setChatStatus('initialized')
-    } catch (error) {
-      logger.error('Error creating new chat:', error)
-      setChatStatus('error')
-    }
-  }, [chatService, chat, welcomeMessage, currentLanguage, setStoredChatLanguage])
-
   // Auto-initialize when hook is first used
   useLayoutEffect(() => {
     if (chatStatus === 'uninitialized' && chatConfig) {
       initializeChat()
     }
   }, [chatStatus, chatConfig, initializeChat])
-
-  // Detect language changes after initialization and create a new chat
-  useEffect(() => {
-    // Skip if chat hasn't been initialized yet
-    if (chatStatus !== 'initialized') {
-      return
-    }
-
-    // Check if language has changed from what's stored
-    const storedLanguage = getStoredChatLanguage()
-    if (storedLanguage !== undefined && storedLanguage !== currentLanguage) {
-      logger.debug('Language changed after initialization, creating new chat', {
-        storedLanguage,
-        currentLanguage
-      })
-      
-      // Create a new chat when language changes
-      createNewChat()
-    }
-  }, [currentLanguage, chatStatus, createNewChat, getStoredChatLanguage])
 
   // Clear stream error when a new message starts  
   useEffect(() => {

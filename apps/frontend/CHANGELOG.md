@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.61
+
+### Patch Changes
+
+- Fiox infinite
+
 ## 0.4.60
 
 ### Patch Changes
