@@ -9,6 +9,8 @@ import type { SupportedLanguage } from '../utils/language'
 
 export type ChatStatus = 'uninitialized' | 'loading' | 'initialized' | 'error'
 
+const CHAT_LANGUAGE_STORAGE_KEY = 'df-chat-language'
+
 export function useChatPersistence() {
   const [chatStatus, setChatStatus] = useState<ChatStatus>('uninitialized')
   const [chatId, setChatId] = useState<string | undefined>(undefined)
@@ -19,8 +21,27 @@ export function useChatPersistence() {
   const { currentLanguage } = useLanguage()
   const {apiBaseUrl} = chatConfig
   
-  // Track previous language to detect changes
-  const previousLanguageRef = useRef<SupportedLanguage | undefined>(currentLanguage)
+  // Helper to get/set chat language from localStorage
+  const getStoredChatLanguage = useCallback((): SupportedLanguage | undefined => {
+    try {
+      const stored = localStorage.getItem(CHAT_LANGUAGE_STORAGE_KEY)
+      return stored as SupportedLanguage | undefined
+    } catch {
+      return undefined
+    }
+  }, [])
+
+  const setStoredChatLanguage = useCallback((language: SupportedLanguage | undefined) => {
+    try {
+      if (language) {
+        localStorage.setItem(CHAT_LANGUAGE_STORAGE_KEY, language)
+      } else {
+        localStorage.removeItem(CHAT_LANGUAGE_STORAGE_KEY)
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [])
 
   // Get user's timezone
   const userTimezone = useMemo(() => {
@@ -84,22 +105,55 @@ export function useChatPersistence() {
     setChatStatus('loading')
     
     try {
-      const chatInit = await chatService.initializeChat(welcomeMessage)
+      // Check if stored language differs from current language
+      const storedLanguage = getStoredChatLanguage()
+      const languageChanged = storedLanguage !== undefined && storedLanguage !== currentLanguage
       
-      // Store initial messages first (before setting chatId to avoid race condition)
-      if (chatInit.messages && chatInit.messages.length > 0) {
-        setInitialMessages(chatInit.messages)
+      if (languageChanged) {
+        // Language has changed, create a new chat instead of loading existing one
+        logger.debug('Language changed since last chat, creating new chat', {
+          storedLanguage,
+          currentLanguage
+        })
+        
+        // Clear existing chat storage
+        await chatService.startNewChat()
+        
+        // Create new chat with localized welcome message
+        const chatInit = await chatService.createNewChat({ welcomeMessage })
+        
+        // Store initial messages
+        if (chatInit.messages && chatInit.messages.length > 0) {
+          setInitialMessages(chatInit.messages)
+        }
+        
+        // Set the chat ID
+        setChatId(chatInit.chatId)
+        
+        // Store the current language
+        setStoredChatLanguage(currentLanguage)
+      } else {
+        // Load existing chat or create new one
+        const chatInit = await chatService.initializeChat(welcomeMessage)
+        
+        // Store initial messages first (before setting chatId to avoid race condition)
+        if (chatInit.messages && chatInit.messages.length > 0) {
+          setInitialMessages(chatInit.messages)
+        }
+        
+        // Set the chat ID to use with useChat (this will trigger useChat reinitialize)
+        setChatId(chatInit.chatId)
+        
+        // Store the current language
+        setStoredChatLanguage(currentLanguage)
       }
-      
-      // Set the chat ID to use with useChat (this will trigger useChat reinitialize)
-      setChatId(chatInit.chatId)
       
       setChatStatus('initialized')
     } catch (error) {
       logger.error('Error loading existing chat:', error)
       setChatStatus('error')
     }
-  }, [chatService, welcomeMessage, chatStatus])
+  }, [chatService, welcomeMessage, chatStatus, currentLanguage, getStoredChatLanguage, setStoredChatLanguage])
 
   // Create a new chat (used when language changes)
   const createNewChat = useCallback(async () => {
@@ -125,12 +179,15 @@ export function useChatPersistence() {
       // Set the new chat ID
       setChatId(chatInit.chatId)
       
+      // Store the current language
+      setStoredChatLanguage(currentLanguage)
+      
       setChatStatus('initialized')
     } catch (error) {
       logger.error('Error creating new chat:', error)
       setChatStatus('error')
     }
-  }, [chatService, chat, welcomeMessage])
+  }, [chatService, chat, welcomeMessage, currentLanguage, setStoredChatLanguage])
 
   // Auto-initialize when hook is first used
   useLayoutEffect(() => {
@@ -139,28 +196,25 @@ export function useChatPersistence() {
     }
   }, [chatStatus, chatConfig, initializeChat])
 
-  // Detect language changes and create a new chat
+  // Detect language changes after initialization and create a new chat
   useEffect(() => {
-    // Skip if this is the initial render or chat hasn't been initialized yet
-    if (chatStatus === 'uninitialized' || chatStatus === 'loading') {
-      previousLanguageRef.current = currentLanguage
+    // Skip if chat hasn't been initialized yet
+    if (chatStatus !== 'initialized') {
       return
     }
 
-    // Check if language has changed
-    if (previousLanguageRef.current !== currentLanguage && chatStatus === 'initialized') {
-      logger.info('Language changed, creating new chat', {
-        previousLanguage: previousLanguageRef.current,
-        newLanguage: currentLanguage
+    // Check if language has changed from what's stored
+    const storedLanguage = getStoredChatLanguage()
+    if (storedLanguage !== undefined && storedLanguage !== currentLanguage) {
+      logger.debug('Language changed after initialization, creating new chat', {
+        storedLanguage,
+        currentLanguage
       })
       
       // Create a new chat when language changes
       createNewChat()
-      
-      // Update the ref to track the new language
-      previousLanguageRef.current = currentLanguage
     }
-  }, [currentLanguage, chatStatus, createNewChat])
+  }, [currentLanguage, chatStatus, createNewChat, getStoredChatLanguage])
 
   // Clear stream error when a new message starts  
   useEffect(() => {

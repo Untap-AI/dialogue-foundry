@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.60
+
+### Patch Changes
+
+- language local storage
+
 ## 0.4.59
 
 ### Patch Changes
