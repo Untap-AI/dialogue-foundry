@@ -14,6 +14,7 @@ import { Response } from '@/components/response';
 
 import { Loader } from '@/components/loader';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useChatPersistence } from '../../hooks/useChatPersistence';
 import type { ChatStatus } from '../../hooks/useChatPersistence';
@@ -94,11 +95,13 @@ const DEFAULT_POWERED_BY_URL = 'https://untap-ai.com'
 export const ChatInterface = React.forwardRef<ChatInterfaceRef, ChatInterfaceProps>(
   ({ onChatStatusChange }, _ref) => {
   const { poweredBy, suggestions: configSuggestions } = useConfig()
+  const { getPoweredByText } = useLanguage()
   const [input, setInput] = useState('');
 
   const showPoweredBy = poweredBy?.show ?? true
   const poweredByText = poweredBy?.text ?? DEFAULT_POWERED_BY_TEXT
   const poweredByUrl = poweredBy?.url ?? DEFAULT_POWERED_BY_URL
+  const poweredByPrefix = getPoweredByText()
   
   // Determine if email should be unbranded based on poweredBy config
   const isUnbranded = 
@@ -159,7 +162,7 @@ export const ChatInterface = React.forwardRef<ChatInterfaceRef, ChatInterfacePro
           <div className={cn(
             "df:text-center df:text-[11px] df:leading-[11px] df:text-primary-foreground df:py-[3px] df:px-0 df:bg-primary"
           )}>
-            Powered by{' '}
+            {poweredByPrefix}{' '}
             <a
               href={poweredByUrl}
               target="_blank"
@@ -183,7 +186,7 @@ export const ChatInterface = React.forwardRef<ChatInterfaceRef, ChatInterfacePro
           <div className={cn(
             "df:text-center df:text-[11px] df:leading-[11px] df:text-primary-foreground df:py-[3px] df:px-0 df:bg-primary"
           )}>
-            Powered by{' '}
+            {poweredByPrefix}{' '}
             <a
               href={poweredByUrl}
               target="_blank"
@@ -285,7 +288,7 @@ export const ChatInterface = React.forwardRef<ChatInterfaceRef, ChatInterfacePro
         <div className={cn(
           "df:text-center df:text-[11px] df:leading-[11px] df:text-primary-foreground df:py-[3px] df:px-0 df:bg-primary"
         )}>
-          Powered by{' '}
+          {poweredByPrefix}{' '}
           <a
             href={poweredByUrl}
             target="_blank"

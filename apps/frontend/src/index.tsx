@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 import { ConfigProvider, type DialogueFoundryConfig } from './contexts/ConfigContext'
+import { LanguageProvider } from './contexts/LanguageContext'
 import { initLogger } from './services/logger'
 
 /**
@@ -27,12 +28,14 @@ async function init(
   // Create React root
   const root = createRoot(rootElement)
 
-  // Render app with config context
+  // Render app with language and config context
   root.render(
     <StrictMode>
-      <ConfigProvider initialConfig={options}>
-        <App />
-      </ConfigProvider>
+      <LanguageProvider>
+        <ConfigProvider initialConfig={options}>
+          <App />
+        </ConfigProvider>
+      </LanguageProvider>
     </StrictMode>
   )
 

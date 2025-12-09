@@ -1,10 +1,23 @@
 import { createContext, useContext, useState, useEffect, useLayoutEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { ChatConfig } from '../services/api'
+import { useLanguage, DEFAULT_POWERED_BY_TRANSLATIONS } from './LanguageContext'
+import type { SupportedLanguage } from '../utils/language'
 
 type Suggestion = {
   label?: string
   prompt: string
+}
+
+// Translatable fields that can be localized per language
+export interface LocalizableConfig {
+  title?: string
+  suggestions?: Suggestion[]
+  welcomeMessage?: string
+  popupMessage?: string
+  poweredBy?: {
+    text?: string
+  }
 }
 
 // Define the Config type that extends ChatConfig and includes any other app-wide settings
@@ -42,6 +55,9 @@ export interface DialogueFoundryConfig {
   }
 
   theme?: 'primary' | 'secondary'
+
+  // Localization support - organize translatable content by language
+  locales?: Partial<Record<SupportedLanguage, LocalizableConfig>>
 }
 
 const styleToVariableMap: Record<keyof DialogueFoundryConfig['styles'], string> = {
@@ -101,6 +117,42 @@ const ConfigContext = createContext<DialogueFoundryConfig>(defaultConfig)
 // Custom hook to use the config context
 export const useConfig = () => useContext(ConfigContext)
 
+/**
+ * Merges locale-specific configuration with the base configuration.
+ * If a language is detected and locale config exists, it overrides the base values.
+ */
+function mergeLocalizedConfig(
+  baseConfig: DialogueFoundryConfig,
+  language: SupportedLanguage | undefined
+): DialogueFoundryConfig {
+  // If no language detected, return base config unchanged
+  if (!language) {
+    return baseConfig
+  }
+
+  const localeConfig = baseConfig.locales?.[language]
+  
+  // If no locale config for this language, return base config unchanged
+  if (!localeConfig) {
+    return baseConfig
+  }
+
+  // Merge locale-specific fields over base config
+  return {
+    ...baseConfig,
+    // Override translatable fields if they exist in locale config
+    ...(localeConfig.title !== undefined && { title: localeConfig.title }),
+    ...(localeConfig.suggestions !== undefined && { suggestions: localeConfig.suggestions }),
+    ...(localeConfig.welcomeMessage !== undefined && { welcomeMessage: localeConfig.welcomeMessage }),
+    ...(localeConfig.popupMessage !== undefined && { popupMessage: localeConfig.popupMessage }),
+    // Deep merge poweredBy
+    poweredBy: {
+      ...baseConfig.poweredBy,
+      ...(localeConfig.poweredBy?.text !== undefined && { text: localeConfig.poweredBy.text }),
+    },
+  }
+}
+
 interface ConfigProviderProps {
   children: ReactNode
   initialConfig?: Partial<DialogueFoundryConfig>
@@ -113,6 +165,7 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
     undefined
   )
   const [configLoaded, setConfigLoaded] = useState(false)
+  const { currentLanguage } = useLanguage()
 
   useEffect(() => {
     // Function to load config from an external JSON file
@@ -174,7 +227,8 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
     loadExternalConfig()
   }, [])
 
-  const finalConfig = config ? {
+  // First merge base config with any overrides
+  const baseConfig = config ? {
     ...(import.meta.env.DEV ? defaultConfig : {}),
     ...config,
     styles: {
@@ -182,6 +236,9 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
       ...config.styles
     }
   } : defaultConfig
+
+  // Then apply locale-specific overrides based on detected language
+  const finalConfig = mergeLocalizedConfig(baseConfig, currentLanguage)
 
   // Dynamically inject styles into CSS custom properties
   useLayoutEffect(() => {
