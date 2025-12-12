@@ -148,7 +148,7 @@ export const sendInquiryEmail = async (
     const msg = {
       to: [{ email: supportEmail }],
       from: {
-        email: 'no-reply@untap-ai.com',
+        email: 'peyton@untap-ai.com',
         name: isUnbranded ? 'AI Assistant' : 'Untap AI'  
       },
       templateId,
