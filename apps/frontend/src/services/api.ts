@@ -249,14 +249,16 @@ export class ChatApiService {
   private storage: Storage
   private api: FetchWrapper
 
-  constructor(config: ChatConfig) {
+  constructor(config: ChatConfig, language?: string) {
     this.apiBaseUrl = config.apiBaseUrl
     this.companyId = config.companyId
-    this.tokenStorageKey = config.tokenStorageKey || DEFAULT_TOKEN_STORAGE_KEY
-    this.chatIdStorageKey =
-      config.chatIdStorageKey || DEFAULT_CHAT_ID_STORAGE_KEY
-    this.userIdStorageKey =
-      config.userIdStorageKey || DEFAULT_USER_ID_STORAGE_KEY
+    
+    // Append language suffix to storage keys if language is provided
+    const suffix = language ? `_${language}` : ''
+    
+    this.tokenStorageKey = (config.tokenStorageKey || DEFAULT_TOKEN_STORAGE_KEY) + suffix
+    this.chatIdStorageKey = (config.chatIdStorageKey || DEFAULT_CHAT_ID_STORAGE_KEY) + suffix
+    this.userIdStorageKey = (config.userIdStorageKey || DEFAULT_USER_ID_STORAGE_KEY) + suffix
     this.storage = getStorage()
 
     // Create fetch wrapper instance

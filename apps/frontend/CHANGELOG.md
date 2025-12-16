@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.62
+
+### Patch Changes
+
+- language chats
+
 ## 0.4.61
 
 ### Patch Changes

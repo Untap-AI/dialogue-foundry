@@ -5,11 +5,8 @@ import { logger } from '../services/logger'
 import { DefaultChatTransport, UIMessage } from 'ai'
 import { useConfig } from '../contexts/ConfigContext'
 import { useLanguage } from '../contexts/LanguageContext'
-import type { SupportedLanguage } from '../utils/language'
 
 export type ChatStatus = 'uninitialized' | 'loading' | 'initialized' | 'error'
-
-const CHAT_LANGUAGE_STORAGE_KEY = 'df-chat-language'
 
 export function useChatPersistence() {
   const [chatStatus, setChatStatus] = useState<ChatStatus>('uninitialized')
@@ -20,28 +17,6 @@ export function useChatPersistence() {
   const { chatConfig, welcomeMessage } = useConfig()
   const { currentLanguage } = useLanguage()
   const {apiBaseUrl} = chatConfig
-  
-  // Helper to get/set chat language from localStorage
-  const getStoredChatLanguage = useCallback((): SupportedLanguage | undefined => {
-    try {
-      const stored = localStorage.getItem(CHAT_LANGUAGE_STORAGE_KEY)
-      return stored as SupportedLanguage | undefined
-    } catch {
-      return undefined
-    }
-  }, [])
-
-  const setStoredChatLanguage = useCallback((language: SupportedLanguage | undefined) => {
-    try {
-      if (language) {
-        localStorage.setItem(CHAT_LANGUAGE_STORAGE_KEY, language)
-      } else {
-        localStorage.removeItem(CHAT_LANGUAGE_STORAGE_KEY)
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [])
 
   // Get user's timezone
   const userTimezone = useMemo(() => {
@@ -53,9 +28,11 @@ export function useChatPersistence() {
     }
   }, [])
 
+  // Create chat service with language-specific storage keys
+  // Each language gets its own chat session
   const chatService = useMemo(
-    () => new ChatApiService(chatConfig),
-    [chatConfig]
+    () => new ChatApiService(chatConfig, currentLanguage),
+    [chatConfig, currentLanguage]
   )
 
   const transport = useMemo(() => {
@@ -105,55 +82,24 @@ export function useChatPersistence() {
     setChatStatus('loading')
     
     try {
-      // Check if stored language differs from current language
-      const storedLanguage = getStoredChatLanguage()
-      const languageChanged = storedLanguage !== undefined && storedLanguage !== currentLanguage
+      // Load existing chat or create new one
+      // (storage keys are language-specific, so each language has its own chat)
+      const chatInit = await chatService.initializeChat(welcomeMessage)
       
-      if (languageChanged) {
-        // Language has changed, create a new chat instead of loading existing one
-        logger.debug('Language changed since last chat, creating new chat', {
-          storedLanguage,
-          currentLanguage
-        })
-        
-        // Clear existing chat storage
-        await chatService.startNewChat()
-        
-        // Create new chat with localized welcome message
-        const chatInit = await chatService.createNewChat({ welcomeMessage })
-        
-        // Store initial messages
-        if (chatInit.messages && chatInit.messages.length > 0) {
-          setInitialMessages(chatInit.messages)
-        }
-        
-        // Set the chat ID
-        setChatId(chatInit.chatId)
-        
-        // Store the current language
-        setStoredChatLanguage(currentLanguage)
-      } else {
-        // Load existing chat or create new one
-        const chatInit = await chatService.initializeChat(welcomeMessage)
-        
-        // Store initial messages first (before setting chatId to avoid race condition)
-        if (chatInit.messages && chatInit.messages.length > 0) {
-          setInitialMessages(chatInit.messages)
-        }
-        
-        // Set the chat ID to use with useChat (this will trigger useChat reinitialize)
-        setChatId(chatInit.chatId)
-        
-        // Store the current language
-        setStoredChatLanguage(currentLanguage)
+      // Store initial messages first (before setting chatId to avoid race condition)
+      if (chatInit.messages && chatInit.messages.length > 0) {
+        setInitialMessages(chatInit.messages)
       }
+      
+      // Set the chat ID to use with useChat (this will trigger useChat reinitialize)
+      setChatId(chatInit.chatId)
       
       setChatStatus('initialized')
     } catch (error) {
       logger.error('Error loading existing chat:', error)
       setChatStatus('error')
     }
-  }, [chatService, welcomeMessage, chatStatus, currentLanguage, getStoredChatLanguage, setStoredChatLanguage])
+  }, [chatService, welcomeMessage, chatStatus])
 
   // Auto-initialize when hook is first used
   useLayoutEffect(() => {
@@ -161,6 +107,16 @@ export function useChatPersistence() {
       initializeChat()
     }
   }, [chatStatus, chatConfig, initializeChat])
+
+  // Reset state when chatService changes (language changed)
+  // This triggers re-initialization with the new language-specific storage keys
+  useEffect(() => {
+    // Reset to uninitialized state - the auto-initialize effect will then run
+    setChatStatus('uninitialized')
+    setChatId(undefined)
+    setInitialMessages([])
+    chat.setMessages([])
+  }, [chatService]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear stream error when a new message starts  
   useEffect(() => {
