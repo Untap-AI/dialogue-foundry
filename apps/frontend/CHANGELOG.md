@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.63
+
+### Patch Changes
+
+- Remove useEffect
+
 ## 0.4.62
 
 ### Patch Changes

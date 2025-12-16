@@ -108,16 +108,6 @@ export function useChatPersistence() {
     }
   }, [chatStatus, chatConfig, initializeChat])
 
-  // Reset state when chatService changes (language changed)
-  // This triggers re-initialization with the new language-specific storage keys
-  useEffect(() => {
-    // Reset to uninitialized state - the auto-initialize effect will then run
-    setChatStatus('uninitialized')
-    setChatId(undefined)
-    setInitialMessages([])
-    chat.setMessages([])
-  }, [chatService]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Clear stream error when a new message starts  
   useEffect(() => {
     if (chat.status === 'submitted' && streamError) {
