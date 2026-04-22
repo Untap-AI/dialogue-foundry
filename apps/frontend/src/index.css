@@ -1,4 +1,116 @@
-@import "tailwindcss" prefix(df) important;
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(df);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(df) important;
+
+/* Preflight replacement: scoped to the widget container so host page styles are untouched.
+   Tailwind's default preflight applies globally via `*` selectors, which leaks into the host
+   site and causes visible reflow/flicker when the widget script loads. We re-apply only the
+   reset behavior that Shadcn/ui components and the widget's own styling depend on. */
+@layer base {
+  #dialogue-foundry-app,
+  #dialogue-foundry-app *,
+  #dialogue-foundry-app ::before,
+  #dialogue-foundry-app ::after {
+    box-sizing: border-box;
+    border: 0 solid;
+  }
+
+  #dialogue-foundry-app button,
+  #dialogue-foundry-app input,
+  #dialogue-foundry-app select,
+  #dialogue-foundry-app optgroup,
+  #dialogue-foundry-app textarea {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    background-color: transparent;
+    border-radius: 0;
+    opacity: 1;
+    margin: 0;
+    padding: 0;
+  }
+
+  #dialogue-foundry-app button,
+  #dialogue-foundry-app input:where([type="button"], [type="reset"], [type="submit"]) {
+    appearance: button;
+  }
+
+  #dialogue-foundry-app h1,
+  #dialogue-foundry-app h2,
+  #dialogue-foundry-app h3,
+  #dialogue-foundry-app h4,
+  #dialogue-foundry-app h5,
+  #dialogue-foundry-app h6 {
+    font-size: inherit;
+    font-weight: inherit;
+    margin: 0;
+  }
+
+  #dialogue-foundry-app p,
+  #dialogue-foundry-app blockquote,
+  #dialogue-foundry-app pre,
+  #dialogue-foundry-app figure,
+  #dialogue-foundry-app dl,
+  #dialogue-foundry-app dd {
+    margin: 0;
+  }
+
+  #dialogue-foundry-app ul,
+  #dialogue-foundry-app ol,
+  #dialogue-foundry-app menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #dialogue-foundry-app img,
+  #dialogue-foundry-app svg,
+  #dialogue-foundry-app video,
+  #dialogue-foundry-app canvas,
+  #dialogue-foundry-app audio,
+  #dialogue-foundry-app iframe,
+  #dialogue-foundry-app embed,
+  #dialogue-foundry-app object {
+    display: block;
+    vertical-align: middle;
+  }
+
+  #dialogue-foundry-app img,
+  #dialogue-foundry-app video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  #dialogue-foundry-app a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  #dialogue-foundry-app b,
+  #dialogue-foundry-app strong {
+    font-weight: bolder;
+  }
+
+  #dialogue-foundry-app ::placeholder {
+    opacity: 1;
+  }
+
+  #dialogue-foundry-app textarea {
+    resize: vertical;
+  }
+
+  #dialogue-foundry-app table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+
+  #dialogue-foundry-app [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
 
 @theme {
   /* Tailwind theme colors connected to our simplified variables */
