@@ -176,7 +176,7 @@ Do NOT call the function if:
         }
       ],
       reasoning: {
-        effort: "minimal"
+        effort: "low"
       },
       service_tier: "priority",
       tools: [requestUserEmailTool]

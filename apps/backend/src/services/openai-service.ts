@@ -101,7 +101,7 @@ export const generateStreamingChatCompletion = async (
       input: limitedMessages,
       instructions: systemPromptWithCurrentDate,
       reasoning: {
-        effort: "minimal"
+        effort: "low"
       },
       stream: true,
       text: {

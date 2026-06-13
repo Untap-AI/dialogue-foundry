@@ -105,7 +105,7 @@ Return ONLY the rewritten query, nothing else.`
       temperature: 0,
       providerOptions: {
         openai: {
-          reasoningEffort: "minimal",
+          reasoningEffort: "low",
         }
       }
     })
@@ -668,7 +668,7 @@ router.post('/stream-ai-sdk', authenticateChatAccess, async (req: CustomRequest,
       },
       providerOptions: {
         openai: {
-          reasoningEffort: "minimal",
+          reasoningEffort: "low",
           textVerbosity: "low",
           serviceTier: "priority"
         }
