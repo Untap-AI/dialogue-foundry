@@ -104,12 +104,14 @@ export const env = {
   analysisMaxPages: optionalInt('ANALYSIS_MAX_PAGES', 8),
 
   // Hard bounds on the two Python subprocesses. Both spawn Chrome, and a hung
-  // browser would otherwise pin a queue worker slot forever. Sized for a depth-1
-  // / 100-page crawl parallelized per Phase 3 (~6-8min in practice); the 5min
-  // fixed LLM-call budget between them is accounted for by the assertion in
-  // queue/worker.ts, not by these values themselves.
+  // browser would otherwise pin a queue worker slot forever. A real depth-1 /
+  // 50-page crawl (bendsoap.com) was observed timing out at the old 20min
+  // ceiling under real per-page anti-bot/LLM-filter cost — 30min gives it
+  // room to actually finish instead of retrying from scratch every time. The
+  // 5min fixed LLM-call budget between them is accounted for by the assertion
+  // in queue/worker.ts, not by these values themselves.
   scrapeTimeoutMs: optionalInt('SCRAPE_TIMEOUT_MS', 5 * 60 * 1000),
-  crawlTimeoutMs: optionalInt('CRAWL_TIMEOUT_MS', 20 * 60 * 1000),
+  crawlTimeoutMs: optionalInt('CRAWL_TIMEOUT_MS', 30 * 60 * 1000),
 
   /* ---- Demo request queue (Supabase table polled by the worker) ---- */
   // The queue always lives in the prod project, independent of a row's is_prod
