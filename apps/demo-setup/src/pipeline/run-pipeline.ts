@@ -40,11 +40,13 @@ export const runPipeline = async (
   env.upstash()
   env.crawlerOpenaiApiKey()
 
-  // Single real-browser scrape (crawl4ai) provides both the page content for
-  // analysis and the rendered homepage HTML for brand-candidate extraction.
+  // Single real-browser scrape (crawl4ai) provides page content for analysis,
+  // computed-style brand signals (colors/logo/fonts read live off the DOM), and
+  // a screenshot for the vision-based brand tiebreak. The HTML-regex candidates
+  // are now only a fallback for when the in-browser probe couldn't run.
   const scraped = await scrapeForDemo(input.companyWebsite)
   const pages = scraped.pages.map(page => page.markdown)
-  const candidates = extractBrandCandidates(
+  const fallbackCandidates = extractBrandCandidates(
     scraped.homepageHtml,
     input.companyWebsite
   )
@@ -52,7 +54,14 @@ export const runPipeline = async (
   // The two consolidated LLM calls, run in parallel.
   const [rawAnalysis, rawBrand] = await Promise.all([
     analyzeContent(pages),
-    detectBrand(input, candidates)
+    detectBrand(
+      input,
+      scraped.brand,
+      scraped.screenshot,
+      scraped.screenshotWidth,
+      scraped.screenshotHeight,
+      fallbackCandidates
+    )
   ])
 
   const { analysis, brand } = enforceQuality(
@@ -63,7 +72,7 @@ export const runPipeline = async (
 
   const systemPrompt = buildSystemPrompt(input, analysis)
 
-  // Persist config and upload the demo pages in parallel.
+  // Persist config and upload the demo page in parallel.
   const html = buildHtml(input, analysis, brand)
   const [, demoUrl] = await Promise.all([
     persistCompanyConfig(input, systemPrompt),

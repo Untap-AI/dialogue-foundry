@@ -33,11 +33,12 @@ export const env = {
     .filter(Boolean),
 
   anthropicApiKey: () => required('ANTHROPIC_API_KEY'),
-  // Fast/cheap extraction model for content analysis + brand selection.
-  modelAnalysis: optional('MODEL_ANALYSIS', 'claude-haiku-4-5'),
-  // The generative copy step (welcome message + suggestions) can use a stronger
-  // model for a quality bump; defaults to the same cheap model.
-  modelBrand: optional('MODEL_BRAND', 'claude-haiku-4-5'),
+  // Generates the welcome message + suggestions — the first thing a prospect
+  // reads, so quality matters more than the cost delta of one call per demo.
+  modelAnalysis: optional('MODEL_ANALYSIS', 'claude-sonnet-5'),
+  // Vision call that picks the brand color/logo out of a screenshot. Also one
+  // call per demo; vision quality directly determines whether colors match.
+  modelBrand: optional('MODEL_BRAND', 'claude-sonnet-5'),
 
   // The background crawl (orchestrator.py) still uses OpenAI internally for
   // content filtering/summarization — unrelated to this service's own Claude
@@ -80,23 +81,35 @@ export const env = {
         )
       : optional(
           'API_BASE_URL_TEST',
-          'https://dialogue-foundry-backend-smokebox-swjv.onrender.com/api'
+          'https://dialogue-foundry-backend-v2-test.onrender.com/api'
         ),
 
   crawlerDir: () => required('CRAWLER_DIR'),
   crawlerPython: optional('CRAWLER_PYTHON', 'python3'),
   crawlerMaxDepth: (isProd: boolean) =>
     isProd
-      ? optional('CRAWLER_MAX_DEPTH_PROD', '0')
-      : optional('CRAWLER_MAX_DEPTH_TEST', '0'),
+      ? optional('CRAWLER_MAX_DEPTH_PROD', '1')
+      : optional('CRAWLER_MAX_DEPTH_TEST', '1'),
+  // Hard cap on pages visited by the deep RAG crawl. Depth alone isn't a bound —
+  // depth 1 on a site with a large footer nav could otherwise be hundreds of
+  // pages.
+  crawlerMaxPages: optional('CRAWLER_MAX_PAGES', '100'),
 
-  // Number of pages the demo-prep scrape reads for content analysis.
-  scrapeMaxPages: optional('SCRAPE_MAX_PAGES', '5'),
+  // Number of pages the shallow demo-prep scrape fetches (homepage + internal
+  // links, ranked by relevance — see web-crawler/scrape_page.py's PATH_PRIORITIES).
+  scrapeMaxPages: optional('SCRAPE_MAX_PAGES', '8'),
+  // How many of those scraped pages get fed to the content-analysis LLM call.
+  // Kept as its own knob (rather than reusing scrapeMaxPages) since a much
+  // larger scrape shouldn't necessarily balloon the prompt.
+  analysisMaxPages: optionalInt('ANALYSIS_MAX_PAGES', 8),
 
   // Hard bounds on the two Python subprocesses. Both spawn Chrome, and a hung
-  // browser would otherwise pin a queue worker slot forever.
+  // browser would otherwise pin a queue worker slot forever. Sized for a depth-1
+  // / 100-page crawl parallelized per Phase 3 (~6-8min in practice); the 5min
+  // fixed LLM-call budget between them is accounted for by the assertion in
+  // queue/worker.ts, not by these values themselves.
   scrapeTimeoutMs: optionalInt('SCRAPE_TIMEOUT_MS', 5 * 60 * 1000),
-  crawlTimeoutMs: optionalInt('CRAWL_TIMEOUT_MS', 15 * 60 * 1000),
+  crawlTimeoutMs: optionalInt('CRAWL_TIMEOUT_MS', 20 * 60 * 1000),
 
   /* ---- Demo request queue (Supabase table polled by the worker) ---- */
   // The queue always lives in the prod project, independent of a row's is_prod
@@ -111,7 +124,7 @@ export const env = {
   // A row claimed longer than this is assumed dead (pm2 restart, reboot, OOM)
   // and is returned to the queue. Must exceed scrape + crawl timeouts combined,
   // or the reaper will steal rows out from under a healthy worker.
-  queueStaleMinutes: optionalInt('DEMO_STALE_MINUTES', 30),
+  queueStaleMinutes: optionalInt('DEMO_STALE_MINUTES', 45),
 
   /* ---- SendGrid (demo-ready notification) ---- */
   // Optional: unset means email is skipped with a warning, so `POST /demos` and

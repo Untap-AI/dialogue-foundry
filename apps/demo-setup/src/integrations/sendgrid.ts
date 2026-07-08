@@ -1,11 +1,13 @@
 import sgMail from '@sendgrid/mail'
 import { env } from '../config/env'
 import { logger } from '../lib/logger'
+import {
+  DEMO_PENDING_SUBJECT,
+  DEMO_READY_SUBJECT,
+  renderDemoPendingEmail,
+  renderDemoReadyEmail
+} from './email-templates'
 
-/* Ported verbatim from the SendGrid node of the n8n workflow this service
- * replaces. The template renders the demo link itself from company_id, so
- * company_id is the only dynamic field it needs. */
-const DEMO_READY_TEMPLATE_ID = 'd-75e4a3c87e304f638c01730516bc9396'
 const FROM = { email: 'demo@untap-ai.com', name: 'Untap AI' } as const
 const INTERNAL_CC = [
   { email: 'james@untap-ai.com' },
@@ -34,10 +36,12 @@ const client = (): typeof sgMail | undefined => {
  * caller records the boolean so a missed email is visible in the queue row. */
 export const sendDemoReadyEmail = async ({
   to,
-  companyId
+  companyId,
+  demoUrl
 }: {
   to: string
   companyId: string
+  demoUrl: string
 }): Promise<boolean> => {
   const mail = client()
   if (!mail) {
@@ -47,17 +51,16 @@ export const sendDemoReadyEmail = async ({
     return false
   }
 
+  const { html, text } = renderDemoReadyEmail({ demoUrl })
+
   try {
     await mail.send({
-      personalizations: [
-        {
-          to: [{ email: to }],
-          cc: INTERNAL_CC,
-          dynamicTemplateData: { company_id: companyId }
-        }
-      ],
+      to,
+      cc: INTERNAL_CC,
       from: FROM,
-      templateId: DEMO_READY_TEMPLATE_ID
+      subject: DEMO_READY_SUBJECT,
+      html,
+      text
     })
     logger.info(`Demo-ready email sent to ${to} for ${companyId}`)
     return true
@@ -65,6 +68,48 @@ export const sendDemoReadyEmail = async ({
     logger.error(`Failed to send demo-ready email for ${companyId}:`, error)
     // SendGrid puts the actionable detail (bad template id, unverified sender)
     // in the response body, not the Error message.
+    const body = (error as { response?: { body?: unknown } }).response?.body
+    if (body) logger.error('SendGrid response body:', JSON.stringify(body))
+    return false
+  }
+}
+
+/* Sent immediately on claiming a request — before scraping, branding, or
+ * crawling have even started — so a prospect isn't left wondering whether
+ * their submission went anywhere during the build. Not CC'd to the team;
+ * it's a receipt, not a milestone worth their attention. Same never-throws
+ * contract as sendDemoReadyEmail. */
+export const sendDemoPendingEmail = async ({
+  to,
+  companyId,
+  companyName
+}: {
+  to: string
+  companyId: string
+  companyName: string
+}): Promise<boolean> => {
+  const mail = client()
+  if (!mail) {
+    logger.warn(
+      `SENDGRID_API_KEY unset — skipping demo-pending email to ${to} for ${companyId}`
+    )
+    return false
+  }
+
+  const { html, text } = renderDemoPendingEmail({ companyName })
+
+  try {
+    await mail.send({
+      to,
+      from: FROM,
+      subject: DEMO_PENDING_SUBJECT,
+      html,
+      text
+    })
+    logger.info(`Demo-pending email sent to ${to} for ${companyId}`)
+    return true
+  } catch (error) {
+    logger.error(`Failed to send demo-pending email for ${companyId}:`, error)
     const body = (error as { response?: { body?: unknown } }).response?.body
     if (body) logger.error('SendGrid response body:', JSON.stringify(body))
     return false

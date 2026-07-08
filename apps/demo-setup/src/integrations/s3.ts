@@ -21,17 +21,12 @@ const putHtml = (key: string, body: string): Promise<unknown> =>
     })
     .promise()
 
-/* Uploads the primary and secondary demo pages to the demo bucket at
- * {companyId}/index.html and {companyId}/secondary/index.html. Returns the
- * public demo URL. */
-export const uploadDemo = async (
-  companyId: string,
-  html: { primary: string; secondary: string }
-): Promise<string> => {
-  await Promise.all([
-    putHtml(`${companyId}/index.html`, html.primary),
-    putHtml(`${companyId}/secondary/index.html`, html.secondary)
-  ])
+/* Uploads the demo page to the demo bucket at {companyId}/index.html. Returns
+ * the public demo URL. detectBrand already picked which widget theme this
+ * demo ships with, so there's exactly one page to upload — no unused
+ * "secondary" variant sitting around for nobody to link to. */
+export const uploadDemo = async (companyId: string, html: string): Promise<string> => {
+  await putHtml(`${companyId}/index.html`, html)
 
   const demoUrl = `${env.demoBaseUrl}/${companyId}/`
   logger.info(`Uploaded demo to ${demoUrl}`)
