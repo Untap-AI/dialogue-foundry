@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.68
+
+### Patch Changes
+
+- Fix double scrollbar on the horizontally-scrollable suggestions list, where the native browser scrollbar and the custom Radix scrollbar were both rendering due to a CSS specificity conflict
+
 ## 0.4.67
 
 ### Patch Changes
