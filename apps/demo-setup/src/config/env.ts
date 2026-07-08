@@ -13,6 +13,18 @@ const required = (key: string): string => {
 const optional = (key: string, fallback: string): string =>
   process.env[key] || fallback
 
+const optionalInt = (key: string, fallback: number): number => {
+  const raw = process.env[key]
+  if (!raw) return fallback
+  const parsed = parseInt(raw, 10)
+  if (Number.isNaN(parsed)) {
+    throw new Error(
+      `Environment variable ${key} must be an integer, got "${raw}"`
+    )
+  }
+  return parsed
+}
+
 export const env = {
   port: parseInt(process.env.PORT || '4000', 10),
   apiKeys: (process.env.DEMO_SETUP_API_KEYS || '')
@@ -64,7 +76,7 @@ export const env = {
     isProd
       ? optional(
           'API_BASE_URL_PROD',
-          'https://dialogue-foundry-backend-v2-test.onrender.com'
+          'https://dialogue-foundry-backend-v2-test.onrender.com/api'
         )
       : optional(
           'API_BASE_URL_TEST',
@@ -75,9 +87,35 @@ export const env = {
   crawlerPython: optional('CRAWLER_PYTHON', 'python3'),
   crawlerMaxDepth: (isProd: boolean) =>
     isProd
-      ? optional('CRAWLER_MAX_DEPTH_PROD', '3')
+      ? optional('CRAWLER_MAX_DEPTH_PROD', '0')
       : optional('CRAWLER_MAX_DEPTH_TEST', '0'),
 
   // Number of pages the demo-prep scrape reads for content analysis.
-  scrapeMaxPages: optional('SCRAPE_MAX_PAGES', '5')
+  scrapeMaxPages: optional('SCRAPE_MAX_PAGES', '5'),
+
+  // Hard bounds on the two Python subprocesses. Both spawn Chrome, and a hung
+  // browser would otherwise pin a queue worker slot forever.
+  scrapeTimeoutMs: optionalInt('SCRAPE_TIMEOUT_MS', 5 * 60 * 1000),
+  crawlTimeoutMs: optionalInt('CRAWL_TIMEOUT_MS', 15 * 60 * 1000),
+
+  /* ---- Demo request queue (Supabase table polled by the worker) ---- */
+  // The queue always lives in the prod project, independent of a row's is_prod
+  // (which only selects where that demo's company config gets written).
+  queueSupabase: () => ({
+    url: required('SUPABASE_PROD_URL'),
+    serviceKey: required('SUPABASE_PROD_SERVICE_ROLE_KEY')
+  }),
+  queueEnabled: optional('DEMO_QUEUE_ENABLED', 'true') !== 'false',
+  queuePollIntervalMs: optionalInt('DEMO_POLL_INTERVAL_MS', 10_000),
+  queueConcurrency: optionalInt('DEMO_WORKER_CONCURRENCY', 2),
+  // A row claimed longer than this is assumed dead (pm2 restart, reboot, OOM)
+  // and is returned to the queue. Must exceed scrape + crawl timeouts combined,
+  // or the reaper will steal rows out from under a healthy worker.
+  queueStaleMinutes: optionalInt('DEMO_STALE_MINUTES', 30),
+
+  /* ---- SendGrid (demo-ready notification) ---- */
+  // Optional: unset means email is skipped with a warning, so `POST /demos` and
+  // local runs work without it.
+  sendgridApiKey: (): string | undefined => process.env.SENDGRID_API_KEY,
+  demoAlertEmail: optional('DEMO_ALERT_EMAIL', 'contact@untap-ai.com')
 }

@@ -1,7 +1,8 @@
 import { logger } from '../lib/logger'
+import { env } from '../config/env'
 import { persistCompanyConfig } from '../integrations/supabase'
 import { uploadDemo } from '../integrations/s3'
-import { startCrawl } from '../integrations/crawler'
+import { runCrawl } from '../integrations/crawler'
 import { scrapeForDemo } from '../integrations/scraper'
 import { prepareInput } from './prepare-input'
 import { extractBrandCandidates } from './extract-brand-candidates'
@@ -12,17 +13,32 @@ import { buildSystemPrompt } from './system-prompt'
 import { buildHtml } from './build-html'
 import type { DemoInput } from '../types'
 
+export type PipelineResult = {
+  demoUrl: string
+  /* Resolves when the RAG namespace is seeded. The demo URL is already live and
+   * correctly branded before this settles, but the widget can't answer anything
+   * company-specific until it does. `POST /demos` ignores it (logging failures);
+   * the queue worker awaits it before emailing the prospect. */
+  crawlDone: Promise<void>
+}
+
 /* Orchestrates the full demo-setup flow. Everything up to and including the S3
- * upload runs inline so the caller gets a working demo URL back. The full deep
- * crawl (which seeds the RAG namespace) is kicked off last as a background job,
- * since the demo is usable (minus RAG answers) before it finishes. */
+ * upload runs inline so the caller gets a working demo URL back. The deep crawl
+ * is started last and handed back as a promise, since the demo is usable (minus
+ * RAG answers) before it finishes. */
 export const runPipeline = async (
   rawInput: DemoInput
-): Promise<{ demoUrl: string }> => {
+): Promise<PipelineResult> => {
   const input = await prepareInput(rawInput)
   logger.info(
     `Starting demo setup for ${input.companyId} (${input.companyWebsite})`
   )
+
+  // Fail before we publish anything if the crawl couldn't run anyway. Resolving
+  // these lazily inside runCrawl meant a missing Upstash var surfaced as a 500
+  // only after S3 and Supabase had already been written.
+  env.upstash()
+  env.crawlerOpenaiApiKey()
 
   // Single real-browser scrape (crawl4ai) provides both the page content for
   // analysis and the rendered homepage HTML for brand-candidate extraction.
@@ -54,9 +70,9 @@ export const runPipeline = async (
     uploadDemo(input.companyId, html)
   ])
 
-  // Fire-and-forget: seed the RAG namespace in the background.
-  startCrawl(input)
+  // Seed the RAG namespace. Started here, awaited (or not) by the caller.
+  const crawlDone = runCrawl(input)
 
   logger.info(`Demo setup complete for ${input.companyId}: ${demoUrl}`)
-  return { demoUrl }
+  return { demoUrl, crawlDone }
 }

@@ -5,6 +5,7 @@ import { env } from './config/env'
 import { logger } from './lib/logger'
 import { demoInputSchema } from './types'
 import { runPipeline } from './pipeline/run-pipeline'
+import { startWorker, stopWorker } from './queue/worker'
 import type {
   NextFunction,
   Request as ExpressRequest,
@@ -55,8 +56,23 @@ app.post('/demos', requireApiKey, async (req, res) => {
   }
 
   try {
-    const result = await runPipeline(parsed.data)
-    return res.status(201).json(result)
+    const { demoUrl, crawlDone } = await runPipeline(parsed.data)
+
+    // This route returns as soon as the demo is live, so nobody awaits the
+    // crawl. Swallow its rejection here or it becomes an unhandled rejection
+    // and takes the process down.
+    void (async () => {
+      try {
+        await crawlDone
+      } catch (error) {
+        logger.error(
+          `Background crawl failed for ${parsed.data.companyId}:`,
+          error
+        )
+      }
+    })()
+
+    return res.status(201).json({ demoUrl })
   } catch (error) {
     logger.error('Demo setup failed:', error)
     return res.status(500).json({
@@ -66,6 +82,25 @@ app.post('/demos', requireApiKey, async (req, res) => {
   }
 })
 
-app.listen(env.port, () => {
+const server = app.listen(env.port, () => {
   logger.info(`demo-setup listening on port ${env.port}`)
 })
+
+startWorker()
+
+/* pm2 sends SIGTERM on restart/stop. Without this, in-flight crawls become
+ * orphaned Chrome processes and their queue rows sit 'processing' until the
+ * reaper times them out. */
+let shuttingDown = false
+const shutdown = async (signal: string) => {
+  if (shuttingDown) return
+  shuttingDown = true
+  logger.info(`Received ${signal}, shutting down`)
+
+  server.close()
+  await stopWorker()
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'))
+process.on('SIGINT', () => void shutdown('SIGINT'))

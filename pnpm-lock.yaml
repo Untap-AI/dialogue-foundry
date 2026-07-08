@@ -126,6 +126,9 @@ importers:
       '@dialogue-foundry/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
+      '@sendgrid/mail':
+        specifier: ^8.1.5
+        version: 8.1.5
       '@supabase/supabase-js':
         specifier: ^2.49.1
         version: 2.49.4
