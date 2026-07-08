@@ -60,3 +60,28 @@ export type BrandResult = {
   brandColor: string
   fontFamily: string
 }
+
+/* A row of the demo_requests queue, written by the marketing site's /api/demo
+ * and claimed by the worker. Mirrors the migration in
+ * apps/backend/supabase/migrations/20260708000000_add_demo_requests_table.sql */
+export type DemoRequestRow = {
+  id: string
+  website_url: string
+  company_name: string
+  contact_email: string
+  delivery_email: string
+  source_path: string | null
+  user_agent: string | null
+  company_id: string | null
+  demo_url: string | null
+  is_prod: boolean
+  status: 'pending' | 'processing' | 'complete' | 'failed'
+  attempts: number
+  max_attempts: number
+  last_error: string | null
+  claimed_at: string | null
+  claimed_by: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string | null
+}
