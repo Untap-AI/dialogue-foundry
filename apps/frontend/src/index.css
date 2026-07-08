@@ -207,34 +207,43 @@
 
 /* Custom scrollbar styling for all devices */
 /* Webkit browsers (Chrome, Safari, Edge) */
-#dialogue-foundry-app ::-webkit-scrollbar {
+/* Excludes Radix ScrollArea viewports, which render their own custom thumb and must keep the native scrollbar hidden */
+#dialogue-foundry-app *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-#dialogue-foundry-app ::-webkit-scrollbar-track {
+#dialogue-foundry-app *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-track {
   background: var(--df-color-background);
   border-radius: 4px;
 }
 
-#dialogue-foundry-app ::-webkit-scrollbar-thumb {
+#dialogue-foundry-app *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-thumb {
   background: var(--df-color-primary);
   border-radius: 4px;
   border: 1px solid var(--df-color-gray-200);
 }
 
-#dialogue-foundry-app ::-webkit-scrollbar-thumb:hover {
+#dialogue-foundry-app *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--df-color-primary) 80%, black);
 }
 
-#dialogue-foundry-app ::-webkit-scrollbar-thumb:active {
+#dialogue-foundry-app *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-thumb:active {
   background: color-mix(in srgb, var(--df-color-primary) 70%, black);
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  display: none;
 }
 
 /* Firefox scrollbar styling */
 #dialogue-foundry-app {
   scrollbar-width: thin;
   scrollbar-color: var(--df-color-primary) var(--df-color-background);
+}
+
+[data-radix-scroll-area-viewport] {
+  scrollbar-width: none;
 }
 
 /* Custom animations */

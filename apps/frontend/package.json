@@ -1,7 +1,7 @@
 {
   "name": "@dialogue-foundry/frontend",
   "private": true,
-  "version": "0.4.67",
+  "version": "0.4.68",
   "type": "module",
   "repository": {
     "type": "git",
