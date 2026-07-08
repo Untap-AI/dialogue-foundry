@@ -93,7 +93,7 @@ export const env = {
   // Hard cap on pages visited by the deep RAG crawl. Depth alone isn't a bound —
   // depth 1 on a site with a large footer nav could otherwise be hundreds of
   // pages.
-  crawlerMaxPages: optional('CRAWLER_MAX_PAGES', '50'),
+  crawlerMaxPages: optional('CRAWLER_MAX_PAGES', '25'),
 
   // Number of pages the shallow demo-prep scrape fetches (homepage + internal
   // links, ranked by relevance — see web-crawler/scrape_page.py's PATH_PRIORITIES).
