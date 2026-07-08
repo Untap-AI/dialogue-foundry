@@ -1,0 +1,12 @@
+{
+  "extends": "@dialogue-foundry/tsconfig/node.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "noEmit": false
+  },
+  "include": ["src/**/*"]
+}
