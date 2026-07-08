@@ -20,29 +20,32 @@ export const renderDemoReadyEmail = ({ demoUrl }: { demoUrl: string }): { html: 
   const safeUrl = escapeHtml(demoUrl)
   const displayUrl = demoUrl.replace(/^https?:\/\//, '')
 
-  const html = `<html lang="en">
-  <body style="font-family: Arial, sans-serif; color: #222;">
-    <p>
-      Thank you for your interest in <strong>Untap AI!</strong> We've prepared your personalized AI assistant demo as requested.
-    </p>
-    <p>
-      <strong>Your live demo:</strong>
-      <a href="${safeUrl}" style="color: #2563eb; text-decoration: underline;">
-        ${escapeHtml(displayUrl)}
-      </a>
-    </p>
-    <p>
-      The AI assistant is trained on your website and acts as your instant customer support rep, ready to answer questions and capture inbound leads.
-    </p>
-    <p>
-      If you'd like a walkthrough, have questions, or want to talk about next steps, just reply to this email. Our team (cc'd) can quickly hop on a call or customize the solution further for your needs.
-    </p>
-    <p>
-      Thanks again for considering Untap AI.<br>
-      <strong>The Untap AI Team</strong>
-    </p>
-  </body>
-</html>`
+  const html = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #222;">
+  <h2 style="color: #465cff; margin-bottom: 20px;">Your Personalized Demo is Ready!</h2>
+
+  <p style="margin-bottom: 15px;">Thank you for your interest in <strong>Untap AI!</strong> We've prepared your personalized AI assistant demo as requested.</p>
+
+  <p style="margin-bottom: 15px;">
+    <strong>Your live demo:</strong><br>
+    <a href="${safeUrl}" style="color: #465cff; text-decoration: none;">${escapeHtml(displayUrl)}</a>
+  </p>
+
+  <p style="margin-bottom: 15px;">The AI assistant is trained on your website and acts as your instant customer support rep, ready to answer questions and capture inbound leads.</p>
+
+  <p style="margin-bottom: 15px;">If you'd like a walkthrough, have questions, or want to talk about next steps, just reply to this email. Our team (cc'd) can quickly hop on a call or customize the solution further for your needs.</p>
+
+  <p style="margin-bottom: 20px;">
+    Thanks again for considering Untap AI.<br>
+    <strong>The Untap AI Team</strong>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+  <p style="color: #666; font-size: 14px; margin: 0;">
+    Questions? Reply to this email or contact us at
+    <a href="mailto:contact@untap-ai.com" style="color: #465cff; text-decoration: none;">contact@untap-ai.com</a>
+  </p>
+</div>`
 
   const text = `Thank you for your interest in Untap AI! We've prepared your personalized AI assistant demo as requested.
 
@@ -53,7 +56,9 @@ The AI assistant is trained on your website and acts as your instant customer su
 If you'd like a walkthrough, have questions, or want to talk about next steps, just reply to this email. Our team (cc'd) can quickly hop on a call or customize the solution further for your needs.
 
 Thanks again for considering Untap AI.
-The Untap AI Team`
+The Untap AI Team
+
+Questions? Reply to this email or contact us at contact@untap-ai.com`
 
   return { html, text }
 }
