@@ -36,6 +36,7 @@ export const runCrawl = (input: PreparedInput): Promise<void> =>
         ...process.env,
         START_URLS: input.companyWebsite,
         MAX_DEPTH: env.crawlerMaxDepth(input.isProd),
+        MAX_PAGES: env.crawlerMaxPages,
         UPSTASH_VECTOR_REST_URL: upstash.url,
         UPSTASH_VECTOR_REST_TOKEN: upstash.token,
         UPSTASH_NAMESPACE: input.namespace,

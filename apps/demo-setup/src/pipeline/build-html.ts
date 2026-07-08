@@ -8,8 +8,8 @@ const buildStyles = (input: PreparedInput, brand: BrandResult) => {
     primaryColor: input.styles?.primaryColor || brand.brandColor,
     fontFamily: input.styles?.fontFamily || brand.fontFamily
   }
-  if (input.styles?.secondaryColor)
-    styles.secondaryColor = input.styles.secondaryColor
+  const secondaryColor = input.styles?.secondaryColor || brand.secondaryColor
+  if (secondaryColor) styles.secondaryColor = secondaryColor
   if (input.styles?.backgroundColor)
     styles.backgroundColor = input.styles.backgroundColor
   return styles
@@ -18,8 +18,7 @@ const buildStyles = (input: PreparedInput, brand: BrandResult) => {
 const buildConfig = (
   input: PreparedInput,
   analysis: ContentAnalysis,
-  brand: BrandResult,
-  theme?: 'secondary'
+  brand: BrandResult
 ): WidgetConfig => {
   const logoUrl = input.logoUrl || brand.logoUrl
   const config: WidgetConfig = {
@@ -43,7 +42,9 @@ const buildConfig = (
     config.logoUrl = ''
   }
 
-  if (theme) config.theme = theme
+  // 'primary' is the widget's own default theme — only set it explicitly for
+  // 'secondary', same as the config always did.
+  if (brand.theme === 'secondary') config.theme = 'secondary'
   return config
 }
 
@@ -85,14 +86,12 @@ ${escapeForInlineScript(JSON.stringify(config, undefined, 2))}
 </body>
 </html>`
 
-/* Builds the primary and secondary widget landing pages. Unlike the n8n "Build
- * HTML" node (which string-templated raw JSON and was fragile), this builds a
- * real config object and serializes it, so escaping is always correct. */
+/* Builds the widget landing page in whichever theme detectBrand picked for
+ * this logo/color combination. Unlike the n8n "Build HTML" node (which
+ * string-templated raw JSON and was fragile), this builds a real config
+ * object and serializes it, so escaping is always correct. */
 export const buildHtml = (
   input: PreparedInput,
   analysis: ContentAnalysis,
   brand: BrandResult
-): { primary: string; secondary: string } => ({
-  primary: renderHtml(buildConfig(input, analysis, brand)),
-  secondary: renderHtml(buildConfig(input, analysis, brand, 'secondary'))
-})
+): string => renderHtml(buildConfig(input, analysis, brand))

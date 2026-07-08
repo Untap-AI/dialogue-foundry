@@ -3,7 +3,7 @@ import { env } from '../config/env'
 import { logger } from '../lib/logger'
 import { deriveCompanyId } from '../lib/slug'
 import { killActiveCrawls } from '../integrations/crawler'
-import { sendDemoReadyEmail, sendInternalAlert } from '../integrations/sendgrid'
+import { sendDemoPendingEmail, sendDemoReadyEmail, sendInternalAlert } from '../integrations/sendgrid'
 import { runPipeline } from '../pipeline/run-pipeline'
 import {
   claimPending,
@@ -37,6 +37,15 @@ const processRequest = async (row: DemoRequestRow): Promise<void> => {
   const companyId = row.company_id ?? deriveCompanyId(row.company_name)
   if (!row.company_id) await setCompanyId(row.id, companyId)
 
+  // Best-effort: a prospect not getting this receipt is far less costly than
+  // stalling the actual build over a SendGrid hiccup, so don't await-and-fail
+  // the request over it.
+  void sendDemoPendingEmail({
+    to: row.delivery_email,
+    companyId,
+    companyName: row.company_name
+  })
+
   const { demoUrl, crawlDone } = await runPipeline({
     companyId,
     companyName: row.company_name,
@@ -51,7 +60,7 @@ const processRequest = async (row: DemoRequestRow): Promise<void> => {
   // that can't answer anything about them.
   await crawlDone
 
-  const sent = await sendDemoReadyEmail({ to: row.delivery_email, companyId })
+  const sent = await sendDemoReadyEmail({ to: row.delivery_email, companyId, demoUrl })
   await markComplete(row.id)
 
   if (!sent) {
@@ -163,12 +172,16 @@ export const startWorker = (): void => {
   }
 
   // The reaper must not be able to steal a row from a worker that is merely
-  // slow. Worst case a job takes scrape + crawl plus the LLM calls between them.
-  const worstCaseMs = env.scrapeTimeoutMs + env.crawlTimeoutMs
+  // slow. Worst case a job takes scrape + crawl plus the LLM calls between them
+  // (analyze-content, detect-brand) — those aren't individually bounded by a
+  // timeout, so budget a fixed allowance for them rather than ignoring them.
+  const LLM_CALL_BUDGET_MS = 5 * 60 * 1000
+  const worstCaseMs = env.scrapeTimeoutMs + env.crawlTimeoutMs + LLM_CALL_BUDGET_MS
   if (env.queueStaleMinutes * 60_000 <= worstCaseMs) {
     throw new Error(
-      `DEMO_STALE_MINUTES (${env.queueStaleMinutes}m) must exceed SCRAPE_TIMEOUT_MS + CRAWL_TIMEOUT_MS ` +
-        `(${Math.ceil(worstCaseMs / 60_000)}m), or the reaper will reclaim rows a healthy worker still holds.`
+      `DEMO_STALE_MINUTES (${env.queueStaleMinutes}m) must exceed SCRAPE_TIMEOUT_MS + CRAWL_TIMEOUT_MS + ` +
+        `${LLM_CALL_BUDGET_MS / 60_000}m LLM budget (${Math.ceil(worstCaseMs / 60_000)}m), or the reaper ` +
+        `will reclaim rows a healthy worker still holds.`
     )
   }
 

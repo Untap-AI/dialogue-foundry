@@ -41,7 +41,10 @@ export type PreparedInput = Omit<DemoInput, 'isProd'> & {
   namespace: string
 }
 
-export type Suggestion = { prompt: string }
+/* `label` is the button text the widget renders; `prompt` is what it sends when
+ * clicked (see ChatInterface's `suggestion.label || suggestion.prompt`). The
+ * button is ~140px wide, so a full question only reads well as a short label. */
+export type Suggestion = { label: string; prompt: string }
 
 /* Output of the single content-analysis LLM call. */
 export type ContentAnalysis = {
@@ -54,11 +57,46 @@ export type ContentAnalysis = {
   suggestions: Suggestion[]
 }
 
-/* Output of the single brand-detection LLM call. */
+/* Output of the single brand-detection LLM call. `theme` picks which widget
+ * header style the demo ships with — 'primary' paints the header in
+ * brandColor (the logo sits on top of it), 'secondary' keeps it white (the
+ * logo sits on a neutral background, brandColor shows up as accents/border
+ * instead). Chosen by comparing the logo's own ink luminance against each
+ * option, so a light-only logo (e.g. a mark drawn for a white background)
+ * doesn't get rendered on top of a background that swallows it. */
 export type BrandResult = {
   logoUrl: string
   brandColor: string
+  secondaryColor: string
   fontFamily: string
+  theme: 'primary' | 'secondary'
+}
+
+export type PixelRect = { top: number; left: number; width: number; height: number }
+
+/* Brand signals read out of the live DOM by web-crawler/brand_probe.js. Every
+ * field is best-effort: a page that blocks script evaluation yields {}. */
+export type BrandProbe = {
+  cssVariables?: { name: string; hex: string; weight: number }[]
+  computedColors?: { hex: string; score: number; uses: number; sources: string[] }[]
+  // Which flat (non-photographic) color covers the most of the rendered page,
+  // read directly from screenshot pixels — see web-crawler/scrape_page.py's
+  // _dominant_flat_colors. `coverage` is a 0-1 fraction of sampled flat tiles.
+  pixelDominantColors?: { hex: string; coverage: number }[]
+  themeColor?: string | null
+  fonts?: { body?: string | null; heading?: string | null }
+  // `rect` is present for candidates found on the homepage (brand_probe.js);
+  // recurrence-only candidates folded in from other pages (scrape_page.py's
+  // _apply_logo_recurrence) have no single position and omit it.
+  logos?: {
+    url: string
+    kind: string
+    area?: number
+    score: number
+    rect?: PixelRect
+    recurringPages?: number
+  }[]
+  title?: string | null
 }
 
 /* A row of the demo_requests queue, written by the marketing site's /api/demo

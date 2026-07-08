@@ -2,9 +2,22 @@ import { spawn } from 'node:child_process'
 import { env } from '../config/env'
 import { logger } from '../lib/logger'
 import { killProcessTree } from '../lib/process-tree'
+import type { BrandProbe } from '../types'
 
 export type ScrapedPage = { url: string; markdown: string }
-export type ScrapeResult = { pages: ScrapedPage[]; homepageHtml: string }
+export type ScrapeResult = {
+  pages: ScrapedPage[]
+  homepageHtml: string
+  /* Computed-style brand signals read out of the live page. `{}` when the probe
+   * couldn't run — callers must fall back to parsing homepageHtml. */
+  brand: BrandProbe
+  /* Base64 JPEG of the homepage above the fold, or '' if capture failed. */
+  screenshot: string
+  // Pixel dimensions of `screenshot` — needed to convert the vision model's
+  // percentage-based logo bounding box back into page pixel coordinates.
+  screenshotWidth: number
+  screenshotHeight: number
+}
 
 /* Runs the local crawl4ai scrape entrypoint (web-crawler/scrape_page.py) as a
  * subprocess and returns its JSON payload. This replaces the old Tavily crawl +
