@@ -22,7 +22,7 @@ import { luminance } from '../lib/color'
 const SAMPLE_SIZE = 128
 const FETCH_TIMEOUT_MS = 5000
 
-const toBuffer = async (url: string): Promise<Buffer | null> => {
+export const fetchImageBuffer = async (url: string): Promise<Buffer | null> => {
   if (url.startsWith('data:')) {
     const base64 = url.split(',')[1]
     return base64 ? Buffer.from(base64, 'base64') : null
@@ -39,7 +39,7 @@ const toBuffer = async (url: string): Promise<Buffer | null> => {
 }
 
 export const sampleLogoColor = async (url: string): Promise<string | null> => {
-  const buffer = await toBuffer(url)
+  const buffer = await fetchImageBuffer(url)
   if (!buffer) return null
 
   try {
@@ -82,7 +82,7 @@ export const sampleLogoColor = async (url: string): Promise<string | null> => {
  * what it's normally shown against?" Used to decide whether a colored
  * (primaryColor) or white header background gives the logo better contrast. */
 export const estimateLogoInkLuminance = async (url: string): Promise<number | null> => {
-  const buffer = await toBuffer(url)
+  const buffer = await fetchImageBuffer(url)
   if (!buffer) return null
 
   try {

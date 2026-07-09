@@ -13,8 +13,8 @@ export type ScrapeResult = {
   brand: BrandProbe
   /* Base64 JPEG of the homepage above the fold, or '' if capture failed. */
   screenshot: string
-  // Pixel dimensions of `screenshot` — needed to convert the vision model's
-  // percentage-based logo bounding box back into page pixel coordinates.
+  // Pixel dimensions of `screenshot`, as reported by scrape_page.py. No longer
+  // consumed since logo selection moved off bounding-box coordinate matching.
   screenshotWidth: number
   screenshotHeight: number
 }
