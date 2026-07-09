@@ -44,14 +44,19 @@ const processRequest = async (row: DemoRequestRow): Promise<void> => {
   const companyId = row.company_id ?? deriveCompanyId(row.website_url)
   if (!row.company_id) await setCompanyId(row.id, companyId)
 
-  // Best-effort: a prospect not getting this receipt is far less costly than
-  // stalling the actual build over a SendGrid hiccup, so don't await-and-fail
-  // the request over it.
-  void sendDemoPendingEmail({
-    to: row.email,
-    companyId,
-    websiteUrl: row.website_url
-  })
+  // Only on the row's first-ever claim — claim_demo_requests increments
+  // attempts on every claim, including reclaims after a restart or stale
+  // timeout, so attempts > 1 here means the prospect already got this email
+  // for this request. Best-effort: a prospect not getting the receipt is far
+  // less costly than stalling the actual build over a SendGrid hiccup, so
+  // don't await-and-fail the request over it.
+  if (row.attempts === 1) {
+    void sendDemoPendingEmail({
+      to: row.email,
+      companyId,
+      websiteUrl: row.website_url
+    })
+  }
 
   const { demoUrl, companyName, crawlDone } = await runPipeline({
     companyId,
