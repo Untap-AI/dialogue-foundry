@@ -34,6 +34,11 @@ export const runCrawl = (input: PreparedInput): Promise<void> =>
       detached: true,
       env: {
         ...process.env,
+        // Belt-and-suspenders alongside orchestrator.py's own
+        // sys.stdout.reconfigure(line_buffering=True) — a piped stdout is
+        // block-buffered by default and can hide many minutes of crawl
+        // progress from these logs.
+        PYTHONUNBUFFERED: '1',
         START_URLS: input.companyWebsite,
         MAX_DEPTH: env.crawlerMaxDepth(input.isProd),
         MAX_PAGES: env.crawlerMaxPages,
