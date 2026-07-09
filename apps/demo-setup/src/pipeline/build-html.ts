@@ -69,13 +69,23 @@ const escapeForInlineScript = (json: string): string =>
     .split(PARAGRAPH_SEPARATOR)
     .join('\\u2029')
 
-const renderHtml = (config: WidgetConfig): string =>
+// fontLinkHref is built by google-fonts.ts via encodeURIComponent, so it's
+// already safe to embed directly in an href attribute.
+const renderFontLinks = (fontLinkHref: string | null): string =>
+  fontLinkHref
+    ? `
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="${fontLinkHref}" />`
+    : ''
+
+const renderHtml = (config: WidgetConfig, fontLinkHref: string | null): string =>
   `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dialogue Foundry Chat Playground</title>
+  <title>Dialogue Foundry Chat Playground</title>${renderFontLinks(fontLinkHref)}
   <script id="dialogue-foundry-config" type="application/json">
 ${escapeForInlineScript(JSON.stringify(config, undefined, 2))}
   </script>
@@ -94,4 +104,4 @@ export const buildHtml = (
   input: PreparedInput,
   analysis: ContentAnalysis,
   brand: BrandResult
-): string => renderHtml(buildConfig(input, analysis, brand))
+): string => renderHtml(buildConfig(input, analysis, brand), brand.fontLinkHref)

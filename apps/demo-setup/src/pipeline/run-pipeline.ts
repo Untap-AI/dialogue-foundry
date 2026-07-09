@@ -90,7 +90,7 @@ export const runPipeline = async (
     )
   ])
 
-  const { analysis, brand } = enforceQuality(
+  const { analysis, brand } = await enforceQuality(
     input.companyId,
     rawAnalysis,
     rawBrand
