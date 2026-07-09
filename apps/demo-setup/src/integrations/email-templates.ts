@@ -65,7 +65,7 @@ Questions? Reply to this email or contact us at contact@untap-ai.com`
 
 /* Sent the moment a request is claimed off the queue — before the site's even
  * scraped, let alone branded — so a prospect isn't left wondering whether
- * their submission went anywhere during the ~30 minute build. */
+ * their submission went anywhere during the ~15 minute build. */
 export const DEMO_PENDING_SUBJECT = 'Your Personalized Demo is Being Created'
 
 export const renderDemoPendingEmail = ({ companyName }: { companyName: string }): { html: string; text: string } => {
@@ -78,7 +78,7 @@ export const renderDemoPendingEmail = ({ companyName }: { companyName: string })
 
   <p style="margin-bottom: 15px;">We've received your request for a personalized demo for <strong>${safeName}</strong>.</p>
 
-  <p style="margin-bottom: 15px;">Our team is now training your AI assistant on your website's content and styling it to match your brand. This usually takes about <strong>30 minutes</strong>.</p>
+  <p style="margin-bottom: 15px;">Our team is now training your AI assistant on your website's content and styling it to match your brand. This usually takes about <strong>15 minutes</strong>.</p>
 
   <p style="margin-bottom: 15px;">You'll receive another email with your private demo link once it's ready.</p>
 
@@ -101,7 +101,7 @@ export const renderDemoPendingEmail = ({ companyName }: { companyName: string })
 
 We've received your request for a personalized demo for ${companyName}.
 
-Our team is now training your AI assistant on your website's content and styling it to match your brand. This usually takes about 30 minutes.
+Our team is now training your AI assistant on your website's content and styling it to match your brand. This usually takes about 15 minutes.
 
 You'll receive another email with your private demo link once it's ready.
 
