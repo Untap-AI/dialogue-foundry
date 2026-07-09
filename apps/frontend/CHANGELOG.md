@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.69
+
+### Patch Changes
+
+- 5704856: Fix suggestions scrollbar still showing double scrollbars in Chromium browsers: a global `!important` `scrollbar-width: thin` utility applied to every widget descendant was overriding Radix ScrollArea's native-scrollbar-hiding styles now that Chromium supports the standard `scrollbar-width` property
+
 ## 0.4.68
 
 ### Patch Changes
