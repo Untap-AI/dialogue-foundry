@@ -110,6 +110,20 @@
   #dialogue-foundry-app [hidden]:where(:not([hidden="until-found"])) {
     display: none !important;
   }
+
+  /* ChatWidget applies `df:[&_*]:scrollbar-thin` (and friends) to every descendant to skin
+     scrollbars app-wide; Tailwind's `important` import (index.css line 3) makes that
+     `!important`. Modern Chromium now honors the standard `scrollbar-width` property, so
+     without this override it re-enables a native scrollbar on top of the Radix ScrollArea's
+     own custom thumb. `!important` in an earlier layer beats `!important` in a later one
+     regardless of specificity, so this must stay inside `@layer base`. */
+  [data-radix-scroll-area-viewport] {
+    scrollbar-width: none !important;
+  }
+
+  [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+    display: none !important;
+  }
 }
 
 @theme {
