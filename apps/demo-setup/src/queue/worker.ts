@@ -3,7 +3,11 @@ import { env } from '../config/env'
 import { logger } from '../lib/logger'
 import { deriveCompanyId } from '../lib/slug'
 import { killActiveCrawls } from '../integrations/crawler'
-import { sendDemoPendingEmail, sendDemoReadyEmail, sendInternalAlert } from '../integrations/sendgrid'
+import {
+  sendDemoPendingEmail,
+  sendDemoReadyEmail,
+  sendInternalAlert
+} from '../integrations/sendgrid'
 import { runPipeline } from '../pipeline/run-pipeline'
 import {
   claimPending,
@@ -12,6 +16,7 @@ import {
   reapStale,
   releaseClaims,
   setCompanyId,
+  setCompanyName,
   setDemoUrl
 } from './repo'
 import type { DemoRequestRow } from '../types'
@@ -33,34 +38,44 @@ const errorMessage = (error: unknown): string =>
 
 const processRequest = async (row: DemoRequestRow): Promise<void> => {
   // Reuse the id from a previous attempt; a fresh slug would orphan that
-  // attempt's S3 objects and Upstash namespace.
-  const companyId = row.company_id ?? deriveCompanyId(row.company_name)
+  // attempt's S3 objects and Upstash namespace. Derived from the URL, not the
+  // company name — the prospect no longer supplies one, and the slug is
+  // needed immediately, before the pipeline has scraped anything.
+  const companyId = row.company_id ?? deriveCompanyId(row.website_url)
   if (!row.company_id) await setCompanyId(row.id, companyId)
 
   // Best-effort: a prospect not getting this receipt is far less costly than
   // stalling the actual build over a SendGrid hiccup, so don't await-and-fail
   // the request over it.
   void sendDemoPendingEmail({
-    to: row.delivery_email,
+    to: row.email,
     companyId,
-    companyName: row.company_name
+    websiteUrl: row.website_url
   })
 
-  const { demoUrl, crawlDone } = await runPipeline({
+  const { demoUrl, companyName, crawlDone } = await runPipeline({
     companyId,
-    companyName: row.company_name,
+    companyName: row.company_name ?? undefined,
     companyWebsite: row.website_url,
-    companyEmail: row.contact_email,
+    companyEmail: row.email,
     isProd: row.is_prod
   })
-  await setDemoUrl(row.id, demoUrl)
+  await Promise.all([
+    setDemoUrl(row.id, demoUrl),
+    setCompanyName(row.id, companyName)
+  ])
 
   // The demo is live and branded now, but its RAG namespace is empty until the
   // crawl lands. Emailing before this resolves sends the prospect to a chatbot
   // that can't answer anything about them.
   await crawlDone
 
-  const sent = await sendDemoReadyEmail({ to: row.delivery_email, companyId, demoUrl })
+  const sent = await sendDemoReadyEmail({
+    to: row.email,
+    companyId,
+    demoUrl,
+    companyName
+  })
   await markComplete(row.id)
 
   if (!sent) {
@@ -68,7 +83,7 @@ const processRequest = async (row: DemoRequestRow): Promise<void> => {
     // nothing. Flag it so a human can forward the link.
     logger.error(`Demo ${companyId} built but the email failed to send`)
     await sendInternalAlert({
-      subject: `[demo-setup] Built ${companyId} but could not email ${row.delivery_email}`,
+      subject: `[demo-setup] Built ${companyId} but could not email ${row.email}`,
       body: `The demo is live at ${demoUrl} but SendGrid rejected the notification. Forward it manually.`
     })
   }
@@ -101,9 +116,9 @@ const handleFailure = async (row: DemoRequestRow, error: unknown) => {
     await sendInternalAlert({
       subject: `[demo-setup] Demo request failed after ${row.max_attempts} attempts`,
       body: [
-        `Company: ${row.company_name}`,
+        `Company: ${row.company_name ?? '(not yet known)'}`,
         `Website: ${row.website_url}`,
-        `Delivery email: ${row.delivery_email}`,
+        `Email: ${row.email}`,
         `Request id: ${row.id}`,
         '',
         `Last error: ${message}`
@@ -140,7 +155,9 @@ const tick = async (): Promise<void> => {
 
   for (const row of rows) {
     inFlight.add(row.id)
-    logger.info(`Claimed demo request ${row.id} for ${row.company_name}`)
+    logger.info(
+      `Claimed demo request ${row.id} for ${row.company_name ?? row.website_url}`
+    )
 
     // Not awaited: the loop must stay free to fill the other concurrency slots.
     // Nothing may escape this IIFE — an unhandled rejection would kill the
@@ -176,7 +193,8 @@ export const startWorker = (): void => {
   // (analyze-content, detect-brand) — those aren't individually bounded by a
   // timeout, so budget a fixed allowance for them rather than ignoring them.
   const LLM_CALL_BUDGET_MS = 5 * 60 * 1000
-  const worstCaseMs = env.scrapeTimeoutMs + env.crawlTimeoutMs + LLM_CALL_BUDGET_MS
+  const worstCaseMs =
+    env.scrapeTimeoutMs + env.crawlTimeoutMs + LLM_CALL_BUDGET_MS
   if (env.queueStaleMinutes * 60_000 <= worstCaseMs) {
     throw new Error(
       `DEMO_STALE_MINUTES (${env.queueStaleMinutes}m) must exceed SCRAPE_TIMEOUT_MS + CRAWL_TIMEOUT_MS + ` +

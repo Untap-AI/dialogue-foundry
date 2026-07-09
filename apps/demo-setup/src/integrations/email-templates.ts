@@ -16,14 +16,21 @@ const escapeHtml = (value: string): string =>
 
 export const DEMO_READY_SUBJECT = 'Your Personalized Demo is Ready!'
 
-export const renderDemoReadyEmail = ({ demoUrl }: { demoUrl: string }): { html: string; text: string } => {
+export const renderDemoReadyEmail = ({
+  demoUrl,
+  companyName
+}: {
+  demoUrl: string
+  companyName: string
+}): { html: string; text: string } => {
   const safeUrl = escapeHtml(demoUrl)
   const displayUrl = demoUrl.replace(/^https?:\/\//, '')
+  const safeName = escapeHtml(companyName)
 
   const html = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #222;">
   <h2 style="color: #465cff; margin-bottom: 20px;">Your Personalized Demo is Ready!</h2>
 
-  <p style="margin-bottom: 15px;">Thank you for your interest in <strong>Untap AI!</strong> We've prepared your personalized AI assistant demo as requested.</p>
+  <p style="margin-bottom: 15px;">Thank you for your interest in <strong>Untap AI!</strong> We've prepared your personalized AI assistant demo for <strong>${safeName}</strong> as requested.</p>
 
   <p style="margin-bottom: 15px;">
     <strong>Your live demo:</strong><br>
@@ -47,7 +54,7 @@ export const renderDemoReadyEmail = ({ demoUrl }: { demoUrl: string }): { html: 
   </p>
 </div>`
 
-  const text = `Thank you for your interest in Untap AI! We've prepared your personalized AI assistant demo as requested.
+  const text = `Thank you for your interest in Untap AI! We've prepared your personalized AI assistant demo for ${companyName} as requested.
 
 Your live demo: ${demoUrl}
 
@@ -68,15 +75,16 @@ Questions? Reply to this email or contact us at contact@untap-ai.com`
  * their submission went anywhere during the ~15 minute build. */
 export const DEMO_PENDING_SUBJECT = 'Your Personalized Demo is Being Created'
 
-export const renderDemoPendingEmail = ({ companyName }: { companyName: string }): { html: string; text: string } => {
-  const safeName = escapeHtml(companyName)
+export const renderDemoPendingEmail = ({ websiteUrl }: { websiteUrl: string }): { html: string; text: string } => {
+  const displayUrl = websiteUrl.replace(/^https?:\/\//, '')
+  const safeDisplayUrl = escapeHtml(displayUrl)
 
   const html = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
   <h2 style="color: #465cff; margin-bottom: 20px;">Your Personalized Demo is Being Created</h2>
 
   <p style="margin-bottom: 15px;">Hi there!</p>
 
-  <p style="margin-bottom: 15px;">We've received your request for a personalized demo for <strong>${safeName}</strong>.</p>
+  <p style="margin-bottom: 15px;">We've received your request for a personalized demo for <strong>${safeDisplayUrl}</strong>.</p>
 
   <p style="margin-bottom: 15px;">Our team is now training your AI assistant on your website's content and styling it to match your brand. This usually takes about <strong>15 minutes</strong>.</p>
 
@@ -99,7 +107,7 @@ export const renderDemoPendingEmail = ({ companyName }: { companyName: string })
 
   const text = `Hi there!
 
-We've received your request for a personalized demo for ${companyName}.
+We've received your request for a personalized demo for ${displayUrl}.
 
 Our team is now training your AI assistant on your website's content and styling it to match your brand. This usually takes about 15 minutes.
 
