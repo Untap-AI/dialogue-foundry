@@ -20,7 +20,9 @@ export const demoInputSchema = z.object({
     .string()
     .min(1)
     .regex(/^[a-zA-Z0-9_-]+$/, 'companyId must be alphanumeric, - or _ only'),
-  companyName: z.string().min(1),
+  // Optional: inferred from the crawl (business-name extraction, then the
+  // site's own branding/title, then the domain) when omitted.
+  companyName: z.string().min(1).optional(),
   companyWebsite: z.string().min(1),
   companyEmail: z.string().email(),
   companyPhone: z.string().optional(),
@@ -105,9 +107,12 @@ export type BrandProbe = {
 export type DemoRequestRow = {
   id: string
   website_url: string
-  company_name: string
-  contact_email: string
-  delivery_email: string
+  // No longer collected by the marketing site's form — null until the worker
+  // derives it from the crawl and writes it back (see queue/worker.ts).
+  company_name: string | null
+  // One address for both roles: it becomes the demo's support_email and is
+  // where the "demo ready" link is sent (the form collects a single email).
+  email: string
   source_path: string | null
   user_agent: string | null
   company_id: string | null

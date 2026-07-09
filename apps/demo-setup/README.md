@@ -44,6 +44,10 @@ retained for backwards compatibility and holds the Upstash namespace
 }
 ```
 
+`companyName` is optional — like `logoUrl`/`title`, omit it and the pipeline
+infers one from the crawl (business-name extraction, then the site's own
+branding/title, then the domain) instead of using the supplied value verbatim.
+
 Returns `201 { "demoUrl": "https://demo.untap-ai.com/acme-1234/" }`. The demo is
 live immediately; RAG answers become available once the background crawl
 finishes.

@@ -37,11 +37,13 @@ const client = (): typeof sgMail | undefined => {
 export const sendDemoReadyEmail = async ({
   to,
   companyId,
-  demoUrl
+  demoUrl,
+  companyName
 }: {
   to: string
   companyId: string
   demoUrl: string
+  companyName: string
 }): Promise<boolean> => {
   const mail = client()
   if (!mail) {
@@ -51,7 +53,7 @@ export const sendDemoReadyEmail = async ({
     return false
   }
 
-  const { html, text } = renderDemoReadyEmail({ demoUrl })
+  const { html, text } = renderDemoReadyEmail({ demoUrl, companyName })
 
   try {
     await mail.send({
@@ -82,11 +84,11 @@ export const sendDemoReadyEmail = async ({
 export const sendDemoPendingEmail = async ({
   to,
   companyId,
-  companyName
+  websiteUrl
 }: {
   to: string
   companyId: string
-  companyName: string
+  websiteUrl: string
 }): Promise<boolean> => {
   const mail = client()
   if (!mail) {
@@ -96,7 +98,7 @@ export const sendDemoPendingEmail = async ({
     return false
   }
 
-  const { html, text } = renderDemoPendingEmail({ companyName })
+  const { html, text } = renderDemoPendingEmail({ websiteUrl })
 
   try {
     await mail.send({

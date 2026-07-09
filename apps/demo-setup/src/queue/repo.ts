@@ -63,6 +63,13 @@ export const setCompanyId = (id: string, companyId: string): Promise<void> =>
 export const setDemoUrl = (id: string, demoUrl: string): Promise<void> =>
   update(id, { demo_url: demoUrl })
 
+/* Written back once the pipeline infers a name (the marketing site no longer
+ * collects one), so the row stays a useful record even though it arrived null. */
+export const setCompanyName = (
+  id: string,
+  companyName: string
+): Promise<void> => update(id, { company_name: companyName })
+
 export const markComplete = (id: string): Promise<void> =>
   update(id, { status: 'complete', completed_at: new Date().toISOString() })
 
