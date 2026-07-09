@@ -72,6 +72,10 @@ export type BrandResult = {
   secondaryColor: string
   fontFamily: string
   theme: 'primary' | 'secondary'
+  // Set by quality.ts when fontFamily is a confirmed-loadable Google Fonts
+  // family; null when it's a system-safe name or wasn't found in Google's
+  // catalog (fontFamily falls back to the default stack in that case).
+  fontLinkHref: string | null
 }
 
 export type PixelRect = { top: number; left: number; width: number; height: number }

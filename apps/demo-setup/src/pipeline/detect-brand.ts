@@ -166,8 +166,8 @@ const matchLogoByPosition = (
   box: BrandSelection['logoBox'],
   screenshotWidth: number,
   screenshotHeight: number
-): string => {
-  if (!box.found || !screenshotWidth || !screenshotHeight) return ''
+): string | null => {
+  if (!box.found || !screenshotWidth || !screenshotHeight) return null
   const target: PixelRect = {
     left: (box.xPct / 100) * screenshotWidth,
     top: (box.yPct / 100) * screenshotHeight,
@@ -181,7 +181,7 @@ const matchLogoByPosition = (
     const iou = intersectionOverUnion(target, logo.rect)
     if (iou > 0.05 && (!best || iou > best.iou)) best = { url: logo.url, iou }
   }
-  return best?.url ?? ''
+  return best?.url ?? null
 }
 
 /* Picks which widget header style the logo actually looks good on. Compares
@@ -247,6 +247,7 @@ export const detectBrand = async (
       brandColor: supplied.brandColor,
       secondaryColor: supplied.secondaryColor ?? '',
       fontFamily: font,
+      fontLinkHref: null,
       theme: await pickTheme(supplied.logoUrl, supplied.brandColor, input.companyId)
     }
   }
@@ -284,6 +285,7 @@ export const detectBrand = async (
       brandColor,
       secondaryColor,
       fontFamily: font,
+      fontLinkHref: null,
       theme: await pickTheme(logoUrl, brandColor, input.companyId)
     }
   }
@@ -352,6 +354,7 @@ export const detectBrand = async (
     brandColor,
     secondaryColor,
     fontFamily: font,
+    fontLinkHref: null,
     theme: await pickTheme(logoUrl, brandColor, input.companyId)
   }
 }

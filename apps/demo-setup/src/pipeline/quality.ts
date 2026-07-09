@@ -1,5 +1,6 @@
 import { contrastRatio, parseRgb, toHex, type Rgb } from '../lib/color'
 import { logger } from '../lib/logger'
+import { resolveGoogleFontLink } from './google-fonts'
 import type { BrandResult, ContentAnalysis, Suggestion } from '../types'
 
 const isValidHttpUrl = (value: string): boolean => {
@@ -16,6 +17,28 @@ const isValidCssColor = (value: string): boolean =>
 
 const DEFAULT_BRAND_COLOR = '#1d4ed8'
 const DEFAULT_FONT_FAMILY = 'system-ui, sans-serif'
+
+/* Fonts guaranteed to render without loading anything — either OS-bundled
+ * fonts present across Windows/macOS/Linux, or CSS generic families the
+ * browser always resolves. A detected font outside this set (e.g. "Rubik")
+ * rendered fine in our headless probe because it loaded the source site's own
+ * font links — it won't render on the demo page unless we load it too, which
+ * is what the Google Fonts lookup below attempts before giving up on it. */
+const SAFE_FONT_NAMES = new Set([
+  'system-ui', '-apple-system', 'blinkmacsystemfont', 'segoe ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace',
+  'arial', 'helvetica', 'helvetica neue', 'georgia', 'times new roman', 'times', 'verdana', 'tahoma',
+  'trebuchet ms', 'courier new', 'courier', 'garamond', 'palatino', 'palatino linotype',
+  'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy'
+])
+
+/* True if at least one font in the stack is one we can guarantee renders —
+ * a detected font paired with its own generic fallback (e.g. "Rubik, sans-serif")
+ * is fine as-is; a bare unrecognized name (e.g. just "Rubik") is not. */
+const hasSafeFallback = (fontFamily: string): boolean =>
+  fontFamily
+    .split(',')
+    .map(part => part.trim().replace(/^["']|["']$/g, '').toLowerCase())
+    .some(name => SAFE_FONT_NAMES.has(name))
 
 /* The widget paints white text on primaryColor (--df-color-primary). WCAG AA for
  * large text / UI components is 3:1; below that the send button is unreadable. */
@@ -75,11 +98,11 @@ const FALLBACK_SUGGESTION: Suggestion = {
  * anything that fails so a bad LLM output never ships a broken widget (empty
  * welcome message, malformed color, garbage logo URL). Logs every repair so
  * regressions are visible without failing the whole request. */
-export const enforceQuality = (
+export const enforceQuality = async (
   companyId: string,
   analysis: ContentAnalysis,
   brand: BrandResult
-): { analysis: ContentAnalysis; brand: BrandResult } => {
+): Promise<{ analysis: ContentAnalysis; brand: BrandResult }> => {
   const safeAnalysis = { ...analysis }
   const safeBrand = { ...brand }
 
@@ -141,7 +164,21 @@ export const enforceQuality = (
     safeBrand.secondaryColor = lightened
   }
 
-  if (!safeBrand.fontFamily) {
+  if (safeBrand.fontFamily && !hasSafeFallback(safeBrand.fontFamily)) {
+    const fontLinkHref = await resolveGoogleFontLink(safeBrand.fontFamily)
+    if (fontLinkHref) {
+      logger.info(`[quality ${companyId}] loading "${safeBrand.fontFamily}" from Google Fonts`)
+      safeBrand.fontLinkHref = fontLinkHref
+      // Keep a generic fallback in the CSS value itself so a slow/failed font
+      // load still degrades gracefully instead of falling to the browser default.
+      safeBrand.fontFamily = `${safeBrand.fontFamily}, sans-serif`
+    } else {
+      logger.warn(
+        `[quality ${companyId}] fontFamily "${safeBrand.fontFamily}" has no safe fallback and isn't a Google Font, using default`
+      )
+      safeBrand.fontFamily = DEFAULT_FONT_FAMILY
+    }
+  } else if (!safeBrand.fontFamily) {
     safeBrand.fontFamily = DEFAULT_FONT_FAMILY
   }
 
