@@ -80,14 +80,7 @@ export const runPipeline = async (
   // The two consolidated LLM calls, run in parallel.
   const [rawAnalysis, rawBrand] = await Promise.all([
     analyzeContent(pages),
-    detectBrand(
-      input,
-      scraped.brand,
-      scraped.screenshot,
-      scraped.screenshotWidth,
-      scraped.screenshotHeight,
-      fallbackCandidates
-    )
+    detectBrand(input, scraped.brand, scraped.screenshot, fallbackCandidates)
   ])
 
   const { analysis, brand } = await enforceQuality(

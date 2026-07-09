@@ -93,7 +93,9 @@ export type BrandProbe = {
   fonts?: { body?: string | null; heading?: string | null }
   // `rect` is present for candidates found on the homepage (brand_probe.js);
   // recurrence-only candidates folded in from other pages (scrape_page.py's
-  // _apply_logo_recurrence) have no single position and omit it.
+  // _apply_logo_recurrence) have no single position and omit those fields.
+  // alt/anchorLabel/linksHome are shown to the vision model as per-candidate
+  // context when it picks the logo by looking at the candidate images.
   logos?: {
     url: string
     kind: string
@@ -101,6 +103,9 @@ export type BrandProbe = {
     score: number
     rect?: PixelRect
     recurringPages?: number
+    alt?: string | null
+    anchorLabel?: string | null
+    linksHome?: boolean
   }[]
   title?: string | null
 }
