@@ -99,6 +99,12 @@ export type BrandProbe = {
   logos?: {
     url: string
     kind: string
+    // Which signal family the candidate came from. The probe quotas slots per
+    // class rather than globally score-sorting, since scores across families
+    // aren't comparable. 'structured' = publisher-declared (schema.org logo,
+    // og:image, manifest icon, apple-touch-icon); 'dom' = found by walking the
+    // page; 'recurrence' = repeats across scraped pages.
+    sourceClass?: 'structured' | 'dom' | 'recurrence'
     area?: number
     score: number
     rect?: PixelRect
