@@ -3,7 +3,7 @@ import { generateObject, jsonSchema } from 'ai'
 import { contrastFromLuminances, luminance, parseRgb } from '../lib/color'
 import { env } from '../config/env'
 import { logger } from '../lib/logger'
-import { rasterizeLogoCandidate } from './rasterize-logo'
+import { rasterizeLogoCandidate, trimLogoForDisplay } from './rasterize-logo'
 import { estimateLogoInkLuminance, sampleLogoColor } from './sample-logo-color'
 import type { BrandCandidates } from './extract-brand-candidates'
 import type { BrandProbe, BrandResult, PreparedInput } from '../types'
@@ -40,7 +40,7 @@ const selectionSchema = jsonSchema<BrandSelection>({
     logoIndex: {
       type: 'integer',
       description:
-        "Index of the numbered candidate image that is this company's logo — the mark or wordmark that identifies the brand, usually shown in the site header and often wrapped in a link to the homepage. Judge each candidate by looking at its image: a navigation label, menu icon, product shot, social icon, or promo banner is NOT the logo even if it sits in the header. When both a pictorial mark/emblem and a plain text rendering are among the candidates, prefer the pictorial mark. Use -1 if none of the candidate images is the company's logo."
+        "Index of the numbered candidate image that is this company's logo — the mark or wordmark that identifies the brand. Judge each candidate by LOOKING at its image, not by its stated provenance. A navigation label (e.g. a glyph spelling 'TV & Home' or 'Store'), menu icon, product shot, social icon, headshot, or promo banner is NOT the logo, even if it sits in the header. A candidate described as a social-preview (og:image/twitter:image) is often a marketing or hero photo rather than a logo — but when it shows the bare brand mark on a plain background it is usually the cleanest version of the logo available, so prefer it over a tiny header glyph. A candidate declared by the site as its schema.org logo is the strongest prior; still reject it if the image plainly isn't a logo. Prefer an image containing the brand's mark and/or name over a generic icon. Use -1 if none of the candidate images is the company's logo."
     }
   }
 })
@@ -125,11 +125,27 @@ const pick = (list: ColorCandidate[], index: number): string =>
 type LogoCandidate = NonNullable<BrandProbe['logos']>[number]
 type VisionLogoCandidate = { logo: LogoCandidate; png: string }
 
-/* One line of DOM context per candidate image — where it sat and how it was
- * labeled. The image itself does most of the work; this catches the case where
- * two candidates look alike (a mark vs. its og:image rendition, say). */
+/* How each candidate got here, in the model's terms. A publisher-declared logo
+ * is a far stronger prior than "an image we found in the header", but not a
+ * certainty — og:image is frequently a marketing/hero shot — so the provenance
+ * is stated and the model still judges by looking. */
+const PROVENANCE: Record<string, string> = {
+  'ld+json': 'declared by the site as its logo (schema.org Organization.logo)',
+  og: "the site's og:image social-preview image",
+  twitter: "the site's twitter:image social-preview image",
+  tile: "the site's Windows tile image",
+  manifest: "an icon from the site's web app manifest",
+  'apple-touch-icon': "the site's apple-touch-icon",
+  favicon: "the site's favicon",
+  img: 'an image found on the page',
+  svg: 'an inline SVG found on the page'
+}
+
+/* One line of context per candidate image — how we found it, where it sat, how
+ * it was labeled. The image itself does most of the work; this catches the case
+ * where two candidates look alike (a mark vs. its og:image rendition, say). */
 const describeCandidate = (logo: LogoCandidate): string => {
-  const parts: string[] = [logo.kind === 'svg' ? 'inline SVG' : logo.kind]
+  const parts: string[] = [PROVENANCE[logo.kind] ?? logo.kind]
   if (logo.rect) {
     parts.push(
       `${logo.rect.width}x${logo.rect.height}px at (${logo.rect.left}, ${logo.rect.top}) on the page`
@@ -142,10 +158,10 @@ const describeCandidate = (logo: LogoCandidate): string => {
   return parts.join(', ')
 }
 
-/* Enough to always include the real mark (the probe's pre-rank only has to get
- * it into the top 8, not to #1), small enough that the vision call stays cheap
- * — the tiles are ≤256px. */
-const VISION_CANDIDATE_LIMIT = 8
+/* The probe quotas its pool to ~13 across three signal families; render all of
+ * them. The tiles are ≤256px, so the marginal cost of a candidate is small
+ * compared to the cost of the real logo missing its slot. */
+const VISION_CANDIDATE_LIMIT = 14
 
 const rasterizeCandidates = async (
   logos: LogoCandidate[]
@@ -159,11 +175,16 @@ const rasterizeCandidates = async (
   return rendered.filter((c): c is VisionLogoCandidate => c.png !== null)
 }
 
-/* When vision abstains or fails: a schema.org-declared logo is authoritative
- * (score >= 100 keeps Organization.logo and excludes the weaker
- * Organization.image entries that share the kind), an apple-touch-icon is
- * at least always the brand's own mark, and only then the heuristic top pick
- * — the ranking that shipped apple.com a nav glyph — gets a say. */
+/* When vision abstains or fails, walk the publisher-declared signals in
+ * descending precision before trusting any heuristic. A schema.org-declared
+ * logo is authoritative (score >= 100 keeps Organization.logo and excludes the
+ * weaker Organization.image entries that share the kind); manifest icons and
+ * apple-touch-icons are at least always the brand's own mark. Only then does
+ * the heuristic top pick — the ranking that shipped apple.com a nav glyph —
+ * get a say. og:image is deliberately absent: unlike the others it is often a
+ * hero photo, and only vision can tell. */
+const FALLBACK_KINDS = ['manifest', 'apple-touch-icon', 'tile', 'favicon']
+
 const fallbackLogoUrl = (
   logos: LogoCandidate[],
   rankedUrls: string[]
@@ -171,8 +192,12 @@ const fallbackLogoUrl = (
   const declared = logos.find(
     logo => logo.kind === 'ld+json' && logo.score >= 100
   )?.url
-  const touchIcon = logos.find(logo => logo.kind === 'apple-touch-icon')?.url
-  return declared ?? touchIcon ?? rankedUrls[0] ?? ''
+  if (declared) return declared
+  for (const kind of FALLBACK_KINDS) {
+    const match = logos.find(logo => logo.kind === kind)?.url
+    if (match) return match
+  }
+  return rankedUrls[0] ?? ''
 }
 
 /* Picks which widget header style the logo actually looks good on. Compares
@@ -350,22 +375,26 @@ export const detectBrand = async (
   // shipping an empty color, which quality.ts would replace with a generic blue.
   const primary = pick(finalColorPool, selection.primaryIndex) || finalColorPool[0]?.hex || ''
 
-  const visionPickedLogo =
+  const visionPicked =
     Number.isInteger(selection.logoIndex) &&
     selection.logoIndex >= 0 &&
     selection.logoIndex < logoCandidates.length
-      ? logoCandidates[selection.logoIndex].logo.url
+      ? logoCandidates[selection.logoIndex].logo
       : null
-  const logoUrl =
-    supplied.logoUrl ??
-    visionPickedLogo ??
-    fallbackLogoUrl(logos, finalLogoPool)
+  const chosenUrl =
+    supplied.logoUrl ?? visionPicked?.url ?? fallbackLogoUrl(logos, finalLogoPool)
 
   logger.info(
     `[brand ${input.companyId}] primary=${primary} ` +
-      `logo=${visionPickedLogo ? `vision-picked #${selection.logoIndex}` : logoUrl ? 'fallback chain' : 'none'} ` +
+      `logo=${visionPicked ? `vision-picked #${selection.logoIndex} (${visionPicked.kind})` : chosenUrl ? 'fallback chain' : 'none'} ` +
       `from ${finalColorPool.length} colors, ${logoCandidates.length}/${visionSourceLogos.length} logo candidates rendered`
   )
+
+  // A social-preview image is often the cleanest rendition of a mark but sits
+  // on a 1200x630 canvas; the widget header needs it cropped to the ink.
+  const logoUrl = chosenUrl
+    ? await trimLogoForDisplay(chosenUrl, input.companyId)
+    : ''
 
   const brandColor = supplied.brandColor ?? primary
   return {
