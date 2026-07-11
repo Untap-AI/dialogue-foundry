@@ -79,19 +79,92 @@ const renderFontLinks = (fontLinkHref: string | null): string =>
   <link rel="stylesheet" href="${fontLinkHref}" />`
     : ''
 
-const renderHtml = (config: WidgetConfig, fontLinkHref: string | null): string =>
+// companyName reaches here from an LLM reading scraped web content, so it can't
+// be trusted into markup unescaped.
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+/* The demo page is otherwise an empty page hosting a chat widget: a prospect who
+ * comes back to it later has no way to say yes without digging up our email.
+ * This is the only conversion path on the page itself, so it stays visible
+ * rather than being another thing to click open. Deliberately styled in Untap's
+ * own colors, not the prospect's brand — it's us talking, not their site. */
+const renderCta = (companyName: string | undefined): string => {
+  const site = companyName ? escapeHtml(companyName) : 'your site'
+
+  return `  <footer class="untap-cta">
+    <div class="untap-cta__text">
+      <strong>This assistant was built for ${site} by Untap AI.</strong>
+      <span>Put it on your real site and it answers questions and captures leads around the clock.</span>
+    </div>
+    <div class="untap-cta__actions">
+      <a class="untap-cta__button" href="${env.demoCtaUrl}">Get this on my site</a>
+      <a class="untap-cta__link" href="mailto:${env.demoCtaEmail}">Talk to us</a>
+    </div>
+  </footer>`
+}
+
+const CTA_STYLES = `    :root { color-scheme: light dark; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+    #root { flex: 1 0 auto; }
+    .untap-cta {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px 24px;
+      /* Extra right padding keeps the actions clear of the widget's floating
+       * launcher, which is fixed to the bottom-right corner and would otherwise
+       * sit on top of them. */
+      padding: 20px 96px 20px 24px;
+      background: #0f1222;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    }
+    .untap-cta__text { display: flex; flex-direction: column; gap: 4px; }
+    .untap-cta__text strong { font-size: 15px; font-weight: 600; }
+    .untap-cta__text span { font-size: 14px; color: #b6bad0; }
+    .untap-cta__actions { display: flex; align-items: center; gap: 16px; }
+    .untap-cta__button {
+      background: #465cff;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .untap-cta__button:hover { background: #3549e0; }
+    .untap-cta__link { color: #b6bad0; font-size: 14px; text-decoration: none; white-space: nowrap; }
+    .untap-cta__link:hover { color: #ffffff; }`
+
+const renderHtml = (
+  config: WidgetConfig,
+  fontLinkHref: string | null,
+  companyName: string | undefined
+): string =>
   `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dialogue Foundry Chat Playground</title>${renderFontLinks(fontLinkHref)}
+  <style>
+${CTA_STYLES}
+  </style>
   <script id="dialogue-foundry-config" type="application/json">
 ${escapeForInlineScript(JSON.stringify(config, undefined, 2))}
   </script>
 </head>
 <body>
   <div id="root"></div>
+${renderCta(companyName)}
   <script type="module" src="${env.widgetScriptUrl}"></script>
 </body>
 </html>`
@@ -104,4 +177,9 @@ export const buildHtml = (
   input: PreparedInput,
   analysis: ContentAnalysis,
   brand: BrandResult
-): string => renderHtml(buildConfig(input, analysis, brand), brand.fontLinkHref)
+): string =>
+  renderHtml(
+    buildConfig(input, analysis, brand),
+    brand.fontLinkHref,
+    input.companyName
+  )

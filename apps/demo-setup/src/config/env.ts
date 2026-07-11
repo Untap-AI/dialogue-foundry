@@ -69,6 +69,12 @@ export const env = {
   demoBucket: optional('DEMO_S3_BUCKET', 'demo.untap-ai.com'),
   demoBaseUrl: optional('DEMO_BASE_URL', 'https://demo.untap-ai.com'),
 
+  // Where the demo page's footer CTA sends a prospect who wants the widget on
+  // their own site. The demo page is otherwise a dead end — the only conversion
+  // path was replying to the "demo ready" email.
+  demoCtaUrl: optional('DEMO_CTA_URL', 'https://untap-ai.com/pricing'),
+  demoCtaEmail: optional('DEMO_CTA_EMAIL', 'contact@untap-ai.com'),
+
   widgetScriptUrl: optional(
     'WIDGET_SCRIPT_URL',
     'https://djwdzs5n3r4m2.cloudfront.net/0.4/index.js'
@@ -86,14 +92,18 @@ export const env = {
 
   crawlerDir: () => required('CRAWLER_DIR'),
   crawlerPython: optional('CRAWLER_PYTHON', 'python3'),
+  // Depth 1 only reaches pages linked directly off the homepage. Depth 2 picks
+  // up the next hop (a menu linked from a menus index, a service detail page),
+  // which is where specifics tend to live. Safe to raise now that the page cap
+  // below is actually enforced by the crawler.
   crawlerMaxDepth: (isProd: boolean) =>
     isProd
-      ? optional('CRAWLER_MAX_DEPTH_PROD', '1')
-      : optional('CRAWLER_MAX_DEPTH_TEST', '1'),
+      ? optional('CRAWLER_MAX_DEPTH_PROD', '2')
+      : optional('CRAWLER_MAX_DEPTH_TEST', '2'),
   // Hard cap on pages visited by the deep RAG crawl. Depth alone isn't a bound —
-  // depth 1 on a site with a large footer nav could otherwise be hundreds of
+  // depth 2 on a site with a large footer nav could otherwise be hundreds of
   // pages.
-  crawlerMaxPages: optional('CRAWLER_MAX_PAGES', '50'),
+  crawlerMaxPages: optional('CRAWLER_MAX_PAGES', '100'),
 
   // Number of pages the shallow demo-prep scrape fetches (homepage + internal
   // links, ranked by relevance — see web-crawler/scrape_page.py's PATH_PRIORITIES).
