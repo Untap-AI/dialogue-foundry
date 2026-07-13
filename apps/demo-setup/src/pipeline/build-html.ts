@@ -1,7 +1,7 @@
 import { env } from '../config/env'
 import type { BrandResult, ContentAnalysis, PreparedInput } from '../types'
 
-type WidgetConfig = Record<string, unknown>
+export type WidgetConfig = Record<string, unknown>
 
 const buildStyles = (input: PreparedInput, brand: BrandResult) => {
   const styles: Record<string, string> = {
@@ -172,14 +172,19 @@ ${renderCta(companyName)}
 /* Builds the widget landing page in whichever theme detectBrand picked for
  * this logo/color combination. Unlike the n8n "Build HTML" node (which
  * string-templated raw JSON and was fragile), this builds a real config
- * object and serializes it, so escaping is always correct. */
+ * object and serializes it, so escaping is always correct.
+ *
+ * Returns the config alongside the html so the caller can also persist it to
+ * widget_configs -- the same object that's baked into the page is what backs
+ * the company's widget-config API response going forward. */
 export const buildHtml = (
   input: PreparedInput,
   analysis: ContentAnalysis,
   brand: BrandResult
-): string =>
-  renderHtml(
-    buildConfig(input, analysis, brand),
-    brand.fontLinkHref,
-    input.companyName
-  )
+): { config: WidgetConfig; html: string } => {
+  const config = buildConfig(input, analysis, brand)
+  return {
+    config,
+    html: renderHtml(config, brand.fontLinkHref, input.companyName)
+  }
+}
