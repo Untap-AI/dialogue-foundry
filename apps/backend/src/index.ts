@@ -5,6 +5,8 @@ import rateLimit from 'express-rate-limit'
 import Honeybadger from '@honeybadger-io/js'
 import chatRoutes from './routes/chat-routes'
 import analyticsRoutes from './routes/analytics-routes'
+import widgetConfigRoutes from './routes/widget-config-routes'
+import adminWidgetConfigRoutes from './routes/admin-widget-config-routes'
 import { logger } from './lib/logger'
 
 // Load environment variables
@@ -95,6 +97,8 @@ app.use(
 app.use('/api/chats', chatRoutes)
 app.use('/api/analytics', analyticsRoutes)
 app.use('/api/events', analyticsRoutes)
+app.use('/api/widget-config', widgetConfigRoutes)
+app.use('/api/admin/widget-configs', adminWidgetConfigRoutes)
 
 // Add Honeybadger error handler (must be after routes, before custom error handler)
 app.use(Honeybadger.errorHandler as any)

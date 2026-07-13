@@ -24,7 +24,7 @@
     "db-migrate": "supabase migration up && pnpm run db-types",
     "db-migrate:remote": "supabase migration up",
     "db-types": "supabase gen types typescript --local > src/types/database.ts",
-    "db-types:remote": "supabase gen types typescript > src/types/database.ts",
+    "db-types:remote": "supabase gen types typescript --linked > src/types/database.ts",
     "db-pull": "supabase db remote commit",
     "db-push": "supabase db push",
     "supabase-start": "supabase start",
@@ -33,7 +33,8 @@
     "new-migration": "node scripts/create-migration.js",
     "chat-config": "ts-node src/scripts/chat-config-manager.ts",
     "chat-config-cli": "ts-node src/scripts/chat-config-cli.ts",
-    "admin:token": "ts-node src/scripts/generate-admin-token.ts",
+    "admin:token": "ts-node scripts/generate-admin-token.ts",
+    "widget-config": "ts-node scripts/upsert-widget-config.ts",
     "install:prod": "pnpm install --production"
   },
   "dependencies": {

@@ -78,7 +78,7 @@ export const authenticateChatAccess = (
         code: 'TOKEN_INVALID'
       })
     }
-    
+
     // Check for token expiration specifically
     if (verifyResult.expired) {
       // Token is structurally valid but expired - don't log this as a warning
@@ -87,7 +87,7 @@ export const authenticateChatAccess = (
         code: 'TOKEN_EXPIRED'
       })
     }
-    
+
     const payload = verifyResult.payload
 
     // Check if the requested chat ID matches the token's chat ID
@@ -127,6 +127,62 @@ export const authenticateChatAccess = (
 }
 
 /**
+ * Middleware for internal admin routes (e.g. widget-config CRUD). Requires an
+ * admin JWT minted via generateAdminAccessToken, distinct from the chat-access
+ * tokens the other middleware here verify.
+ */
+export const authenticateAdmin = (
+  req: CustomRequest,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization
+    const token = extractTokenFromHeader(authHeader)
+    if (!token) {
+      return res.status(401).json({
+        error: 'Authentication required. Provide a valid Bearer token.',
+        code: 'TOKEN_MISSING'
+      })
+    }
+
+    const verifyResult = verifyAdminToken(token)
+    if (!verifyResult) {
+      return res.status(401).json({
+        error: 'Invalid admin token.',
+        code: 'TOKEN_INVALID'
+      })
+    }
+
+    if (verifyResult.expired) {
+      return res.status(401).json({
+        error: 'Your admin session has expired.',
+        code: 'TOKEN_EXPIRED'
+      })
+    }
+
+    Object.assign(req, {
+      user: {
+        userId: verifyResult.payload.userId,
+        isAdmin: true
+      }
+    })
+
+    return next()
+  } catch (error) {
+    logger.error('Admin auth middleware error', {
+      error: error as Error,
+      path: req.originalUrl,
+      method: req.method
+    })
+    return res.status(500).json({
+      error: 'Authentication failed',
+      code: 'AUTH_FAILED'
+    })
+  }
+}
+
+/**
  * Middleware for routes that only need user authentication without specific chat access
  */
 export const authenticateUser = (
@@ -150,12 +206,12 @@ export const authenticateUser = (
     // Verify token
     const verifyResult = verifyToken(token)
     if (!verifyResult) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Invalid token. Please reinitialize your session.',
         code: 'TOKEN_INVALID'
       })
     }
-    
+
     // Check for token expiration specifically
     if (verifyResult.expired) {
       return res.status(401).json({
@@ -163,7 +219,7 @@ export const authenticateUser = (
         code: 'TOKEN_EXPIRED'
       })
     }
-    
+
     const payload = verifyResult.payload
 
     // Add user info to request for future middleware/handlers using Object.assign
@@ -181,7 +237,7 @@ export const authenticateUser = (
       path: req.originalUrl,
       method: req.method
     })
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Authentication failed',
       code: 'AUTH_FAILED'
     })
