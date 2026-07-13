@@ -2,12 +2,9 @@ import { useState, useEffect } from 'react'
 import { useConfig } from '../contexts/ConfigContext'
 import { logger } from '../services/logger'
 import { isBotActive } from '../utils/chat-availability'
+import { NETWORK_TIMEOUT_MS } from '../utils/network'
 
 export type AvailabilityStatus = 'checking' | 'available' | 'unavailable'
-
-// Cap how long we'll wait for the availability check before failing open. A
-// hung backend must never leave the widget stuck invisible for always-on bots.
-const AVAILABILITY_TIMEOUT_MS = 5000
 
 /**
  * Checks whether the bot is currently within its configured active hours.
@@ -35,10 +32,7 @@ export function useChatAvailability(): AvailabilityStatus {
 
     let cancelled = false
     const controller = new AbortController()
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      AVAILABILITY_TIMEOUT_MS
-    )
+    const timeoutId = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS)
 
     const checkAvailability = async () => {
       try {

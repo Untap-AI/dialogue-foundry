@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useLayoutEffect } from 'react'
+import { NETWORK_TIMEOUT_MS } from '../utils/network'
+import { useLanguage, DEFAULT_POWERED_BY_TRANSLATIONS } from './LanguageContext'
 import type { ReactNode } from 'react'
 import type { ChatConfig } from '../services/api'
-import { useLanguage, DEFAULT_POWERED_BY_TRANSLATIONS } from './LanguageContext'
 import type { SupportedLanguage } from '../utils/language'
 
 type Suggestion = {
@@ -162,6 +163,143 @@ function mergeLocalizedConfig(
   }
 }
 
+const resolveRuntimeApiBaseUrl = (): string =>
+  window.location.hostname === 'localhost'
+    ? 'http://localhost:3000/api'
+    : `${window.location.origin}/api`
+
+// Almost every customer shares the multi-tenant backend baked in at build
+// time (VITE_API_BASE_URL). A handful run their own dedicated backend
+// instead — add an entry here rather than a customer-facing embed knob, so
+// their script tag stays as plain as everyone else's.
+const COMPANY_API_BASE_URL_OVERRIDES: Record<string, string> = {
+  nsi: 'https://dialogue-foundry-nsi.onrender.com/api'
+}
+
+type EmbedResolution = {
+  companyId: string
+  apiBaseUrl: string
+  embedConfig: Partial<DialogueFoundryConfig>
+}
+
+/**
+ * Resolves companyId/apiBaseUrl/embedConfig from whichever embed script tag
+ * is present. Legacy `#dialogue-foundry-config` (a full JSON blob) always
+ * wins if present; otherwise falls back to the new minimal
+ * `#dialogue-foundry-widget` embed, which supplies only a companyId and
+ * resolves apiBaseUrl via COMPANY_API_BASE_URL_OVERRIDES, falling back to the
+ * bundle-baked VITE_API_BASE_URL. Returns undefined if neither tag is present
+ * (the existing no-config default-only path).
+ */
+function resolveEmbedConfig(): EmbedResolution | undefined {
+  const configScript = document.getElementById('dialogue-foundry-config')
+
+  if (configScript && configScript.textContent) {
+    try {
+      const textContent = configScript.textContent.trim()
+      let jsonContent = textContent
+
+      // If there are comments in the text content, try to extract just the JSON
+      if (textContent.includes('/*') || textContent.includes('//')) {
+        const jsonMatch = textContent.match(/(\{[\s\S]*\})/)
+        if (jsonMatch) {
+          jsonContent = jsonMatch[1]
+        }
+      }
+
+      const parsedConfig = JSON.parse(jsonContent) as Partial<DialogueFoundryConfig>
+
+      // If API URL is a placeholder, replace it with the actual URL
+      if (parsedConfig.chatConfig?.apiBaseUrl === 'RUNTIME_PLACEHOLDER') {
+        parsedConfig.chatConfig = {
+          ...parsedConfig.chatConfig,
+          apiBaseUrl: resolveRuntimeApiBaseUrl()
+        }
+      }
+
+      if (parsedConfig.chatConfig?.companyId && parsedConfig.chatConfig?.apiBaseUrl) {
+        return {
+          companyId: parsedConfig.chatConfig.companyId,
+          apiBaseUrl: parsedConfig.chatConfig.apiBaseUrl,
+          embedConfig: parsedConfig
+        }
+      }
+    } catch (parseError) {
+      console.error('Error parsing config from script tag:', parseError)
+    }
+  }
+
+  const widgetScript = document.getElementById('dialogue-foundry-widget')
+  const companyId = widgetScript?.dataset.companyId
+
+  if (companyId) {
+    return {
+      companyId,
+      apiBaseUrl:
+        COMPANY_API_BASE_URL_OVERRIDES[companyId] ||
+        import.meta.env.VITE_API_BASE_URL ||
+        resolveRuntimeApiBaseUrl(),
+      embedConfig: {}
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * Fetches the backend-persisted widget config for a company. Never throws:
+ * any timeout, network error, or non-2xx response resolves to {} so the
+ * widget always fails open to defaults/embed values.
+ */
+async function fetchWidgetConfigFromBackend(
+  apiBaseUrl: string,
+  companyId: string
+): Promise<Partial<DialogueFoundryConfig>> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/widget-config/${encodeURIComponent(companyId)}`,
+      { signal: controller.signal }
+    )
+
+    if (!response.ok) return {}
+
+    return (await response.json()) as Partial<DialogueFoundryConfig>
+  } catch {
+    return {}
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+/**
+ * Precedence (highest wins): embed config > backend config > hardcoded
+ * defaults. `styles`/`poweredBy` are deep-merged one level so a partial
+ * override in one layer doesn't blow away sibling keys set in another.
+ */
+function mergeResolvedConfig(
+  backendConfig: Partial<DialogueFoundryConfig>,
+  embedConfig: Partial<DialogueFoundryConfig>
+): DialogueFoundryConfig {
+  return {
+    ...defaultConfig,
+    ...backendConfig,
+    ...embedConfig,
+    styles: {
+      ...defaultConfig.styles,
+      ...backendConfig.styles,
+      ...embedConfig.styles
+    },
+    poweredBy: {
+      ...defaultConfig.poweredBy,
+      ...backendConfig.poweredBy,
+      ...embedConfig.poweredBy
+    }
+  }
+}
+
 interface ConfigProviderProps {
   children: ReactNode
   initialConfig?: Partial<DialogueFoundryConfig>
@@ -187,48 +325,28 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
       }
 
       try {
-        // Try to load from a script tag with id="dialogue-foundry-config"
-        const configScript = document.getElementById('dialogue-foundry-config')
+        const resolved = resolveEmbedConfig()
 
-        if (configScript && configScript.textContent) {
-          try {
-            // Extract the actual JSON content, ignoring any comments.
-            const textContent = configScript.textContent.trim()
-            let jsonContent = textContent
-
-            // If there are comments in the text content, try to extract just the JSON
-            if (textContent.includes('/*') || textContent.includes('//')) {
-              // Simple regex to extract JSON - this assumes the JSON is a complete object
-              const jsonMatch = textContent.match(/(\{[\s\S]*\})/)
-              if (jsonMatch) {
-                jsonContent = jsonMatch[1]
-              }
-            }
-
-            const parsedConfig = JSON.parse(jsonContent)
-
-            // If API URL is a placeholder, replace it with the actual URL
-            if (parsedConfig.chatConfig?.apiBaseUrl === 'RUNTIME_PLACEHOLDER') {
-              parsedConfig.chatConfig.apiBaseUrl =
-                window.location.hostname === 'localhost'
-                  ? 'http://localhost:3000/api'
-                  : `${window.location.origin}/api`
-            }
-
-            setConfigState(parsedConfig)
-            setConfigLoaded(true)
-            return
-          } catch (parseError) {
-            console.error('Error parsing config from script tag:', parseError)
-          }
+        if (!resolved) {
+          console.log('No external config found, using defaults')
+          setConfigState(defaultConfig)
+          setConfigLoaded(true)
+          return
         }
 
-        // If no config was found, just use defaults
-        console.log('No external config found, using defaults')
-        setConfigState(defaultConfig)
+        const { companyId, apiBaseUrl, embedConfig } = resolved
+        const backendConfig = await fetchWidgetConfigFromBackend(apiBaseUrl, companyId)
+
+        setConfigState(
+          mergeResolvedConfig(backendConfig, {
+            ...embedConfig,
+            chatConfig: embedConfig.chatConfig ?? { apiBaseUrl, companyId }
+          })
+        )
         setConfigLoaded(true)
       } catch (error) {
         console.error('Error loading dialogue foundry configuration:', error)
+        setConfigState(defaultConfig)
         setConfigLoaded(true)
       }
     }
