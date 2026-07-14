@@ -95,9 +95,13 @@ export const runPipeline = async (
   const systemPrompt = buildSystemPrompt(resolvedInput, analysis)
 
   // Persist config and upload the demo page in parallel.
-  const html = buildHtml(resolvedInput, analysis, brand)
+  const { config: widgetConfig, html } = buildHtml(
+    resolvedInput,
+    analysis,
+    brand
+  )
   const [, demoUrl] = await Promise.all([
-    persistCompanyConfig(resolvedInput, systemPrompt),
+    persistCompanyConfig(resolvedInput, systemPrompt, widgetConfig),
     uploadDemo(input.companyId, html)
   ])
 

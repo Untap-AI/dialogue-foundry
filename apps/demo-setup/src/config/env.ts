@@ -79,16 +79,6 @@ export const env = {
     'WIDGET_SCRIPT_URL',
     'https://djwdzs5n3r4m2.cloudfront.net/0.4/index.js'
   ),
-  apiBaseUrl: (isProd: boolean) =>
-    isProd
-      ? optional(
-          'API_BASE_URL_PROD',
-          'https://dialogue-foundry-backend-v2-test.onrender.com/api'
-        )
-      : optional(
-          'API_BASE_URL_TEST',
-          'https://dialogue-foundry-backend-v2-test.onrender.com/api'
-        ),
 
   crawlerDir: () => required('CRAWLER_DIR'),
   crawlerPython: optional('CRAWLER_PYTHON', 'python3'),

@@ -1,7 +1,7 @@
 import { env } from '../config/env'
 import type { BrandResult, ContentAnalysis, PreparedInput } from '../types'
 
-type WidgetConfig = Record<string, unknown>
+export type WidgetConfig = Record<string, unknown>
 
 const buildStyles = (input: PreparedInput, brand: BrandResult) => {
   const styles: Record<string, string> = {
@@ -22,10 +22,6 @@ const buildConfig = (
 ): WidgetConfig => {
   const logoUrl = input.logoUrl || brand.logoUrl
   const config: WidgetConfig = {
-    chatConfig: {
-      apiBaseUrl: env.apiBaseUrl(input.isProd),
-      companyId: input.companyId
-    },
     popupMessage: input.popupMessage || 'Have questions? Click here for help!',
     openOnLoad: 'desktop-only',
     poweredBy: { show: false },
@@ -47,27 +43,6 @@ const buildConfig = (
   if (brand.theme === 'secondary') config.theme = 'secondary'
   return config
 }
-
-const LINE_SEPARATOR = String.fromCharCode(0x2028)
-const PARAGRAPH_SEPARATOR = String.fromCharCode(0x2029)
-
-/* Config values (welcomeMessage, suggestions, company name) come from an LLM
- * reading untrusted scraped web content, so a page could contain a sequence
- * that breaks out of the inline <script> block. Escape script-terminating
- * sequences after serializing so the JSON payload can never close the tag or
- * be misparsed as HTML (U+2028/2029 are valid in JSON but invalid in JS).
- * Uses split/join instead of regex so the unicode separators don't have to
- * appear as literal characters in source. */
-const escapeForInlineScript = (json: string): string =>
-  json
-    .split('<')
-    .join('\\u003c')
-    .split('-->')
-    .join('--\\u003e')
-    .split(LINE_SEPARATOR)
-    .join('\\u2028')
-    .split(PARAGRAPH_SEPARATOR)
-    .join('\\u2029')
 
 // fontLinkHref is built by google-fonts.ts via encodeURIComponent, so it's
 // already safe to embed directly in an href attribute.
@@ -144,8 +119,14 @@ const CTA_STYLES = `    :root { color-scheme: light dark; }
     .untap-cta__link { color: #b6bad0; font-size: 14px; text-decoration: none; white-space: nowrap; }
     .untap-cta__link:hover { color: #ffffff; }`
 
+/* The demo page uses the standard minimal embed: a single module script that
+ * carries only the companyId. The widget fetches its appearance config from
+ * GET /api/widget-config/:companyId (the widget_configs row this pipeline also
+ * writes) rather than an inline JSON blob, so the page and the API can't drift.
+ * apiBaseUrl is resolved by the widget bundle from its build-time
+ * VITE_API_BASE_URL, so it isn't templated here. */
 const renderHtml = (
-  config: WidgetConfig,
+  companyId: string,
   fontLinkHref: string | null,
   companyName: string | undefined
 ): string =>
@@ -158,28 +139,28 @@ const renderHtml = (
   <style>
 ${CTA_STYLES}
   </style>
-  <script id="dialogue-foundry-config" type="application/json">
-${escapeForInlineScript(JSON.stringify(config, undefined, 2))}
-  </script>
 </head>
 <body>
   <div id="root"></div>
 ${renderCta(companyName)}
-  <script type="module" src="${env.widgetScriptUrl}"></script>
+  <script id="dialogue-foundry-widget" type="module" src="${env.widgetScriptUrl}" data-company-id="${escapeHtml(companyId)}"></script>
 </body>
 </html>`
 
-/* Builds the widget landing page in whichever theme detectBrand picked for
- * this logo/color combination. Unlike the n8n "Build HTML" node (which
- * string-templated raw JSON and was fragile), this builds a real config
- * object and serializes it, so escaping is always correct. */
+/* Builds the widget landing page and the config that backs it. The page itself
+ * only references the companyId (minimal embed); the returned config is what the
+ * caller persists to widget_configs, and that row is what the widget-config API
+ * serves the page at runtime -- so there's a single source of truth, no inline
+ * JSON that could drift from the API. Theme/colors still come from detectBrand
+ * via buildConfig. */
 export const buildHtml = (
   input: PreparedInput,
   analysis: ContentAnalysis,
   brand: BrandResult
-): string =>
-  renderHtml(
-    buildConfig(input, analysis, brand),
-    brand.fontLinkHref,
-    input.companyName
-  )
+): { config: WidgetConfig; html: string } => {
+  const config = buildConfig(input, analysis, brand)
+  return {
+    config,
+    html: renderHtml(input.companyId, brand.fontLinkHref, input.companyName)
+  }
+}
