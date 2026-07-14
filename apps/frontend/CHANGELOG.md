@@ -1,5 +1,11 @@
 # @dialogue-foundry/frontend
 
+## 0.4.71
+
+### Patch Changes
+
+- No functional code change — forces a rebuild/republish of the `0.4/index.js` CDN bundle so it picks up the corrected `VITE_API_BASE_URL` build secret (was missing the `/api` path segment, which broke every request `fetchWidgetConfigFromBackend`/`useChatAvailability`/`useChatPersistence` make for the new minimal `#dialogue-foundry-widget` embed path added in 0.4.70).
+
 ## 0.4.70
 
 ### Patch Changes
