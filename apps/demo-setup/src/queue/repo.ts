@@ -70,6 +70,21 @@ export const setCompanyName = (
   companyName: string
 ): Promise<void> => update(id, { company_name: companyName })
 
+/* Detected website platform (wordpress, shopify, ...), written back so the
+ * funnel's trial-offer email can deep-link to the matching install guide.
+ * Undefined (nothing detected) leaves the column at its null default. */
+export const setPlatform = (
+  id: string,
+  platform: string | undefined
+): Promise<void> => update(id, { platform })
+
+/* The Message-ID we stamped on the demo-ready email, stored so the funnel's
+ * trial-offer follow-up can reply on the same thread. */
+export const setDemoReadyMessageId = (
+  id: string,
+  messageId: string
+): Promise<void> => update(id, { demo_ready_message_id: messageId })
+
 export const markComplete = (id: string): Promise<void> =>
   update(id, { status: 'complete', completed_at: new Date().toISOString() })
 

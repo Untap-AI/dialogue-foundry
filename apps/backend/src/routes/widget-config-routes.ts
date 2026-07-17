@@ -1,6 +1,8 @@
 import express from 'express'
 import NodeCache from 'node-cache'
 import { getWidgetConfigByCompanyId } from '../db/widget-configs'
+import { recordWidgetInstall } from '../db/widget-installs'
+import { normalizeHostname, isTrackableInstallDomain } from '../lib/origin'
 import { logger } from '../lib/logger'
 import type { WidgetConfigWithHours } from '../db/widget-configs'
 
@@ -10,6 +12,33 @@ const router = express.Router()
 // minute. Keyed by companyId; values are the serialized response body.
 const CACHE_TTL_SECONDS = 60
 const cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, useClones: false })
+
+// Write throttle for the install beacon: at most one DB write per
+// (company, domain) per 10 minutes per instance. last_seen freshness within
+// that window is plenty for an active/inactive signal, and it keeps a busy
+// customer site from hammering the RPC on every pageview.
+const INSTALL_THROTTLE_SECONDS = 600
+const installThrottle = new NodeCache({
+  stdTTL: INSTALL_THROTTLE_SECONDS,
+  useClones: false
+})
+
+// Detect a real-site install from the request Origin and record it. Runs before
+// the cache lookup (cache hits must still refresh last_seen) and is fire-and-
+// forget so it can never slow or fail the config response.
+const recordInstallFromOrigin = (
+  companyId: string,
+  originHeader?: string
+): void => {
+  const domain = normalizeHostname(originHeader)
+  if (!domain || !isTrackableInstallDomain(domain)) return
+
+  const throttleKey = `${companyId}|${domain}`
+  if (installThrottle.get(throttleKey)) return
+  installThrottle.set(throttleKey, true)
+
+  void recordWidgetInstall(companyId, domain)
+}
 
 /**
  * Maps DB rows to the DialogueFoundryConfig-shaped JSON the frontend merges
@@ -77,6 +106,11 @@ const serializeWidgetConfig = ({
 // the only 500s; the frontend fails open regardless.
 router.get('/:companyId', async (req, res) => {
   const { companyId } = req.params
+
+  // Install beacon: the widget fetches this on every boot, so the Origin header
+  // tells us which site it's running on. Recorded before the cache lookup so a
+  // cache hit still refreshes the install's last_seen.
+  recordInstallFromOrigin(companyId, req.headers.origin)
 
   try {
     const cached = cache.get<Record<string, unknown>>(companyId)

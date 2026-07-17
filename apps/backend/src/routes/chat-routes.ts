@@ -33,6 +33,7 @@ import {
 } from '../services/vector-service'
 
 import { logger } from '../lib/logger'
+import { normalizeHostname } from '../lib/origin'
 import type { CustomRequest } from '../middleware/auth-middleware'
 import type { Message, ChatSettings } from '../services/openai-service'
 import { sendInquiryEmail } from '../services/sendgrid-service'
@@ -183,10 +184,15 @@ router.post('/', async (req, res) => {
 
     const userId = userIdParam === 'undefined' || userIdParam === undefined ? uuidv4() : userIdParam
 
+    // Capture where the chat originated so the demo funnel can exclude the
+    // team's own testing (by IP) and distinguish demo-page chats from chats on a
+    // customer's live site. Best-effort context; both may be null.
     const chat = await createChatAdmin({
       name: chatName,
       user_id: userId,
-      company_id: companyId
+      company_id: companyId,
+      ip_address: req.ip,
+      origin_domain: normalizeHostname(req.headers.origin)
     })
 
     if (welcomeMessage) {

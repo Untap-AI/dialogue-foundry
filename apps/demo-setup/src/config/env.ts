@@ -130,5 +130,33 @@ export const env = {
   // Optional: unset means email is skipped with a warning, so `POST /demos` and
   // local runs work without it.
   sendgridApiKey: (): string | undefined => process.env.SENDGRID_API_KEY,
-  demoAlertEmail: optional('DEMO_ALERT_EMAIL', 'contact@untap-ai.com')
+  demoAlertEmail: optional('DEMO_ALERT_EMAIL', 'contact@untap-ai.com'),
+
+  /* ---- Conversion funnel (post-demo lifecycle poller) ---- */
+  // Off by default so enabling the sequence is a deliberate deploy-time choice.
+  funnelEnabled: optional('FUNNEL_ENABLED', 'false') === 'true',
+  funnelPollIntervalMs: optionalInt('FUNNEL_POLL_INTERVAL_MS', 60_000),
+  // Only demos completed after this ISO timestamp enter the funnel, so turning
+  // the poller on doesn't email a backlog of stale prospects. Default: the Unix
+  // epoch is wrong here (would sweep everything), so require it be set to opt a
+  // window in; unset means "only demos completed from now on" via the fallback.
+  funnelBackfillSince: optional(
+    'FUNNEL_BACKFILL_SINCE',
+    '1970-01-01T00:00:00Z'
+  ),
+  // Comma-separated IPs whose demo chats are the team's own testing, excluded
+  // from the engagement signal so we don't email ourselves a trial offer.
+  funnelTeamIps: (process.env.FUNNEL_TEAM_IPS || '')
+    .split(',')
+    .map(ip => ip.trim())
+    .filter(Boolean),
+  // How long to wait after a prospect first engages before sending the trial
+  // offer. A short pause makes the founder note read as a human noticing and
+  // replying, not a bot firing the instant they type.
+  trialOfferDelayMinutes: optionalInt('TRIAL_OFFER_DELAY_MINUTES', 60),
+  nudgeAfterDays: optionalInt('NUDGE_AFTER_DAYS', 3),
+  trialLengthDays: optionalInt('TRIAL_LENGTH_DAYS', 14),
+  trialEndingLeadDays: optionalInt('TRIAL_ENDING_LEAD_DAYS', 2),
+  // Base for the install-guide deep links in funnel emails.
+  installBaseUrl: optional('INSTALL_BASE_URL', 'https://untap-ai.com/install')
 }
