@@ -6,6 +6,7 @@ import { logger } from './lib/logger'
 import { demoInputSchema } from './types'
 import { runPipeline } from './pipeline/run-pipeline'
 import { startWorker, stopWorker } from './queue/worker'
+import { startFunnelPoller, stopFunnelPoller } from './funnel/poller'
 import type {
   NextFunction,
   Request as ExpressRequest,
@@ -87,6 +88,7 @@ const server = app.listen(env.port, () => {
 })
 
 startWorker()
+startFunnelPoller()
 
 /* pm2 sends SIGTERM on restart/stop. Without this, in-flight crawls become
  * orphaned Chrome processes and their queue rows sit 'processing' until the
@@ -98,6 +100,7 @@ const shutdown = async (signal: string) => {
   logger.info(`Received ${signal}, shutting down`)
 
   server.close()
+  stopFunnelPoller()
   await stopWorker()
   process.exit(0)
 }

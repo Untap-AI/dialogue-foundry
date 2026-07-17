@@ -1,4 +1,5 @@
 import { hostname } from 'node:os'
+import { randomUUID } from 'node:crypto'
 import { env } from '../config/env'
 import { logger } from '../lib/logger'
 import { deriveCompanyId } from '../lib/slug'
@@ -12,6 +13,8 @@ import { runPipeline } from '../pipeline/run-pipeline'
 import {
   claimPending,
   markComplete,
+  setPlatform,
+  setDemoReadyMessageId,
   markFailed,
   reapStale,
   releaseClaims,
@@ -58,7 +61,7 @@ const processRequest = async (row: DemoRequestRow): Promise<void> => {
     })
   }
 
-  const { demoUrl, companyName, crawlDone } = await runPipeline({
+  const { demoUrl, companyName, platform, crawlDone } = await runPipeline({
     companyId,
     companyName: row.company_name ?? undefined,
     companyWebsite: row.website_url,
@@ -67,7 +70,8 @@ const processRequest = async (row: DemoRequestRow): Promise<void> => {
   })
   await Promise.all([
     setDemoUrl(row.id, demoUrl),
-    setCompanyName(row.id, companyName)
+    setCompanyName(row.id, companyName),
+    setPlatform(row.id, platform)
   ])
 
   // The demo is live and branded now, but its RAG namespace is empty until the
@@ -75,11 +79,18 @@ const processRequest = async (row: DemoRequestRow): Promise<void> => {
   // that can't answer anything about them.
   await crawlDone
 
+  // Stamp a Message-ID we control so the funnel's trial-offer email can reply on
+  // this thread. Stored before sending so the stored value always matches what
+  // SendGrid was told, even if the process dies mid-send.
+  const demoReadyMessageId = `<demo-${companyId}-${randomUUID()}@untap-ai.com>`
+  await setDemoReadyMessageId(row.id, demoReadyMessageId)
+
   const sent = await sendDemoReadyEmail({
     to: row.email,
     companyId,
     demoUrl,
-    companyName
+    companyName,
+    messageId: demoReadyMessageId
   })
   await markComplete(row.id)
 

@@ -136,8 +136,10 @@ export type Database = {
           company_id: string | null
           created_at: string
           id: string
+          ip_address: string | null
           messages_count: number | null
           name: string
+          origin_domain: string | null
           updated_at: string | null
           user_email: string | null
           user_id: string
@@ -146,8 +148,10 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          ip_address?: string | null
           messages_count?: number | null
           name: string
+          origin_domain?: string | null
           updated_at?: string | null
           user_email?: string | null
           user_id: string
@@ -156,8 +160,10 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          ip_address?: string | null
           messages_count?: number | null
           name?: string
+          origin_domain?: string | null
           updated_at?: string | null
           user_email?: string | null
           user_id?: string
@@ -249,6 +255,83 @@ export type Database = {
           },
         ]
       }
+      demo_funnel: {
+        Row: {
+          company_id: string
+          company_name: string | null
+          concierge_requested_at: string | null
+          created_at: string
+          demo_completed_at: string
+          demo_request_id: string | null
+          email: string
+          first_engaged_at: string | null
+          id: string
+          install_domain: string | null
+          nudge_sent_at: string | null
+          platform: string | null
+          stage: string
+          trial_ending_email_sent_at: string | null
+          trial_ends_at: string | null
+          trial_offer_sent_at: string | null
+          trial_started_at: string | null
+          trial_started_email_sent_at: string | null
+          updated_at: string | null
+          website_url: string
+        }
+        Insert: {
+          company_id: string
+          company_name?: string | null
+          concierge_requested_at?: string | null
+          created_at?: string
+          demo_completed_at: string
+          demo_request_id?: string | null
+          email: string
+          first_engaged_at?: string | null
+          id?: string
+          install_domain?: string | null
+          nudge_sent_at?: string | null
+          platform?: string | null
+          stage?: string
+          trial_ending_email_sent_at?: string | null
+          trial_ends_at?: string | null
+          trial_offer_sent_at?: string | null
+          trial_started_at?: string | null
+          trial_started_email_sent_at?: string | null
+          updated_at?: string | null
+          website_url: string
+        }
+        Update: {
+          company_id?: string
+          company_name?: string | null
+          concierge_requested_at?: string | null
+          created_at?: string
+          demo_completed_at?: string
+          demo_request_id?: string | null
+          email?: string
+          first_engaged_at?: string | null
+          id?: string
+          install_domain?: string | null
+          nudge_sent_at?: string | null
+          platform?: string | null
+          stage?: string
+          trial_ending_email_sent_at?: string | null
+          trial_ends_at?: string | null
+          trial_offer_sent_at?: string | null
+          trial_started_at?: string | null
+          trial_started_email_sent_at?: string | null
+          updated_at?: string | null
+          website_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_funnel_demo_request_id_fkey"
+            columns: ["demo_request_id"]
+            isOneToOne: false
+            referencedRelation: "demo_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo_requests: {
         Row: {
           attempts: number
@@ -264,6 +347,7 @@ export type Database = {
           is_prod: boolean
           last_error: string | null
           max_attempts: number
+          platform: string | null
           source_path: string | null
           status: string
           updated_at: string | null
@@ -284,6 +368,7 @@ export type Database = {
           is_prod?: boolean
           last_error?: string | null
           max_attempts?: number
+          platform?: string | null
           source_path?: string | null
           status?: string
           updated_at?: string | null
@@ -304,6 +389,7 @@ export type Database = {
           is_prod?: boolean
           last_error?: string | null
           max_attempts?: number
+          platform?: string | null
           source_path?: string | null
           status?: string
           updated_at?: string | null
@@ -415,6 +501,33 @@ export type Database = {
           },
         ]
       }
+      widget_installs: {
+        Row: {
+          company_id: string
+          domain: string
+          first_seen: string
+          hits: number
+          id: string
+          last_seen: string
+        }
+        Insert: {
+          company_id: string
+          domain: string
+          first_seen?: string
+          hits?: number
+          id?: string
+          last_seen?: string
+        }
+        Update: {
+          company_id?: string
+          domain?: string
+          first_seen?: string
+          hits?: number
+          id?: string
+          last_seen?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -451,6 +564,10 @@ export type Database = {
       }
       get_table_ddl: { Args: { target_table: string }; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      record_widget_install: {
+        Args: { p_company_id: string; p_domain: string }
+        Returns: undefined
+      }
       reap_stale_demo_requests: {
         Args: { p_stale_minutes: number }
         Returns: {

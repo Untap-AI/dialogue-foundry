@@ -78,13 +78,23 @@ export type BrandResult = {
   fontLinkHref: string | null
 }
 
-export type PixelRect = { top: number; left: number; width: number; height: number }
+export type PixelRect = {
+  top: number
+  left: number
+  width: number
+  height: number
+}
 
 /* Brand signals read out of the live DOM by web-crawler/brand_probe.js. Every
  * field is best-effort: a page that blocks script evaluation yields {}. */
 export type BrandProbe = {
   cssVariables?: { name: string; hex: string; weight: number }[]
-  computedColors?: { hex: string; score: number; uses: number; sources: string[] }[]
+  computedColors?: {
+    hex: string
+    score: number
+    uses: number
+    sources: string[]
+  }[]
   // Which flat (non-photographic) color covers the most of the rendered page,
   // read directly from screenshot pixels — see web-crawler/scrape_page.py's
   // _dominant_flat_colors. `coverage` is a 0-1 fraction of sampled flat tiles.
@@ -119,6 +129,42 @@ export type BrandProbe = {
 /* A row of the demo_requests queue, written by the marketing site's /api/demo
  * and claimed by the worker. Mirrors the migration in
  * apps/backend/supabase/migrations/20260708000000_add_demo_requests_table.sql */
+export type FunnelStage =
+  | 'demo_sent'
+  | 'trial_offered'
+  | 'nudged'
+  | 'trial_started'
+  | 'trial_ending'
+  | 'converted'
+  | 'expired'
+  | 'closed'
+
+/* One row per demo company in the demo_funnel table. Milestone timestamps are
+ * the source of truth; `stage` is materialized alongside for observability. */
+export type FunnelRow = {
+  id: string
+  company_id: string
+  demo_request_id: string | null
+  email: string
+  website_url: string
+  company_name: string | null
+  platform: string | null
+  stage: FunnelStage
+  demo_completed_at: string
+  first_engaged_at: string | null
+  trial_offer_sent_at: string | null
+  nudge_sent_at: string | null
+  concierge_requested_at: string | null
+  install_domain: string | null
+  trial_started_at: string | null
+  trial_ends_at: string | null
+  trial_started_email_sent_at: string | null
+  trial_ending_email_sent_at: string | null
+  demo_ready_message_id: string | null
+  created_at: string
+  updated_at: string | null
+}
+
 export type DemoRequestRow = {
   id: string
   website_url: string
@@ -132,6 +178,12 @@ export type DemoRequestRow = {
   user_agent: string | null
   company_id: string | null
   demo_url: string | null
+  // Website platform detected during the build (wordpress, shopify, ...), or
+  // null when unrecognized. Deep-links the funnel's install-guide email.
+  platform: string | null
+  // Message-ID stamped on the demo-ready email, so the trial-offer follow-up can
+  // thread as a reply on the same conversation.
+  demo_ready_message_id: string | null
   is_prod: boolean
   status: 'pending' | 'processing' | 'complete' | 'failed'
   attempts: number

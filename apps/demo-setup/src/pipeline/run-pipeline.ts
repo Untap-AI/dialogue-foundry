@@ -12,6 +12,7 @@ import { detectBrand } from './detect-brand'
 import { enforceQuality } from './quality'
 import { buildSystemPrompt } from './system-prompt'
 import { buildHtml } from './build-html'
+import { detectPlatform } from './detect-platform'
 import type {
   BrandProbe,
   ContentAnalysis,
@@ -25,6 +26,10 @@ export type PipelineResult = {
    * or whatever was inferred (see resolveCompanyName below). The queue worker
    * writes this back onto the demo_requests row once known. */
   companyName: string
+  /* Website platform detected from the scraped homepage (wordpress, shopify,
+   * etc.), or undefined when unrecognized. The worker writes it back so the
+   * funnel's trial-offer email can deep-link to the matching install guide. */
+  platform: string | undefined
   /* Resolves when the RAG namespace is seeded. The demo URL is already live and
    * correctly branded before this settles, but the widget can't answer anything
    * company-specific until it does. `POST /demos` ignores it (logging failures);
@@ -76,6 +81,7 @@ export const runPipeline = async (
     scraped.homepageHtml,
     input.companyWebsite
   )
+  const platform = detectPlatform(scraped.homepageHtml)
 
   // The two consolidated LLM calls, run in parallel.
   const [rawAnalysis, rawBrand] = await Promise.all([
@@ -109,5 +115,5 @@ export const runPipeline = async (
   const crawlDone = runCrawl(resolvedInput)
 
   logger.info(`Demo setup complete for ${input.companyId}: ${demoUrl}`)
-  return { demoUrl, companyName, crawlDone }
+  return { demoUrl, companyName, platform, crawlDone }
 }
